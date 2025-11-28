@@ -2,12 +2,12 @@
   "name": "md2mdocx",
   "version": "1.0.2",
   "description": "Convert Markdown to manual-style Word documents (docx)",
-  "main": "md2docx.js",
+  "main": "md2mdocx.js",
   "bin": {
-    "md2mdocx": "./md2docx.js"
+    "md2mdocx": "./md2mdocx.js"
   },
   "scripts": {
-    "start": "node md2docx.js"
+    "start": "node md2mdocx.js"
   },
   "keywords": [
     "markdown",
@@ -27,7 +27,7 @@
     "node": ">=16.0.0"
   },
   "files": [
-    "md2docx.js",
+    "md2mdocx.js",
     "README.md"
   ],
   "dependencies": {
