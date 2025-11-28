@@ -1,0 +1,835 @@
+#!/usr/bin/env node
+/**
+ * Markdown to Word Converter
+ * マニュアルテンプレート形式
+ * 
+ * Usage: bun md2docx.js input.md output.docx [options]
+ * Options:
+ *   --title "製品名"
+ *   --subtitle "マニュアル"
+ *   --doctype "操作マニュアル"
+ *   --version "1.0.0"
+ *   --date "2024年1月1日"
+ *   --dept "技術開発部"
+ *   --docnum "DOC-001"
+ *   --logo "logo.png"
+ *   --company "会社名"
+ */
+
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Header, Footer,
+        AlignmentType, PageNumber, BorderStyle, WidthType, HeadingLevel, PageBreak,
+        TableOfContents, ShadingType, LevelFormat, ImageRun } = require('docx');
+const fs = require('fs');
+const path = require('path');
+
+// ===== 設定 =====
+const PAGE_WIDTH = 11906;
+const MARGIN = 1440;
+const CONTENT_WIDTH = PAGE_WIDTH - (MARGIN * 2);
+const headerBorder = { style: BorderStyle.SINGLE, size: 24, color: "2F4F76" };
+const tableBorder = { style: BorderStyle.SINGLE, size: 1, color: "000000" };
+
+// ===== コマンドライン引数パース =====
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const options = {
+    input: null,
+    output: null,
+    title: "製品名",
+    subtitle: "マニュアル",
+    doctype: "操作マニュアル",
+    version: "1.0.0",
+    date: new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }),
+    dept: "技術開発部",
+    docnum: "DOC-001",
+    logo: null,
+    company: "サンプル株式会社"
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--')) {
+      const key = args[i].slice(2);
+      if (options.hasOwnProperty(key) && i + 1 < args.length) {
+        options[key] = args[++i];
+      }
+    } else if (!options.input) {
+      options.input = args[i];
+    } else if (!options.output) {
+      options.output = args[i];
+    }
+  }
+
+  if (!options.input) {
+    console.error('Usage: node md2docx.js input.md output.docx [options]');
+    console.error('Options: --title, --subtitle, --doctype, --version, --date, --dept, --docnum, --logo, --company');
+    process.exit(1);
+  }
+
+  if (!options.output) {
+    options.output = options.input.replace(/\.md$/, '.docx');
+  }
+
+  return options;
+}
+
+// ===== Markdownパーサー =====
+class MarkdownParser {
+  constructor(markdown) {
+    this.lines = markdown.split('\n');
+    this.pos = 0;
+    this.elements = [];
+    this.images = [];
+  }
+
+  parse() {
+    while (this.pos < this.lines.length) {
+      const line = this.lines[this.pos];
+      
+      if (line.trim() === '') {
+        this.pos++;
+        continue;
+      }
+
+      // コードブロック
+      if (line.startsWith('```')) {
+        this.parseCodeBlock();
+        continue;
+      }
+
+      // 見出し
+      const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+      if (headingMatch) {
+        this.elements.push({
+          type: 'heading',
+          level: headingMatch[1].length,
+          text: headingMatch[2]
+        });
+        this.pos++;
+        continue;
+      }
+
+      // 画像（Markdown形式）
+      const imageMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+      if (imageMatch) {
+        this.elements.push({
+          type: 'image',
+          alt: imageMatch[1],
+          src: imageMatch[2]
+        });
+        this.pos++;
+        continue;
+      }
+
+      // 画像（HTMLのimgタグ）
+      const imgTagMatch = line.match(/<img\s+[^>]*src=["']([^"']+)["'][^>]*>/i);
+      if (imgTagMatch) {
+        const altMatch = line.match(/alt=["']([^"']*)["']/i);
+        const widthMatch = line.match(/width=["']?(\d+)["']?/i);
+        const heightMatch = line.match(/height=["']?(\d+)["']?/i);
+        this.elements.push({
+          type: 'image',
+          alt: altMatch ? altMatch[1] : '',
+          src: imgTagMatch[1],
+          width: widthMatch ? parseInt(widthMatch[1]) : null,
+          height: heightMatch ? parseInt(heightMatch[1]) : null
+        });
+        this.pos++;
+        continue;
+      }
+
+      // テーブル
+      if (line.includes('|') && this.pos + 1 < this.lines.length && 
+          this.lines[this.pos + 1].match(/^\|?[\s\-:|]+\|?$/)) {
+        this.parseTable();
+        continue;
+      }
+
+      // 箇条書き（番号なし）
+      if (line.match(/^[\s]*[-*+]\s+/)) {
+        this.parseList('bullet');
+        continue;
+      }
+
+      // 箇条書き（番号付き）
+      if (line.match(/^[\s]*\d+\.\s+/)) {
+        this.parseList('number');
+        continue;
+      }
+
+      // 引用
+      if (line.startsWith('>')) {
+        this.parseBlockquote();
+        continue;
+      }
+
+      // 水平線
+      if (line.match(/^[-*_]{3,}$/)) {
+        this.elements.push({ type: 'hr' });
+        this.pos++;
+        continue;
+      }
+
+      // 通常の段落
+      this.parseParagraph();
+    }
+
+    return this.elements;
+  }
+
+  parseCodeBlock() {
+    const startLine = this.lines[this.pos];
+    const lang = startLine.slice(3).trim();
+    this.pos++;
+    
+    const codeLines = [];
+    while (this.pos < this.lines.length && !this.lines[this.pos].startsWith('```')) {
+      codeLines.push(this.lines[this.pos]);
+      this.pos++;
+    }
+    this.pos++; // 閉じ```をスキップ
+
+    this.elements.push({
+      type: 'code',
+      language: lang,
+      content: codeLines.join('\n')
+    });
+  }
+
+  parseTable() {
+    const rows = [];
+    
+    // ヘッダー行
+    const headerLine = this.lines[this.pos];
+    rows.push(this.parseTableRow(headerLine));
+    this.pos++;
+    
+    // 区切り行をスキップ
+    this.pos++;
+    
+    // データ行
+    while (this.pos < this.lines.length && this.lines[this.pos].includes('|')) {
+      rows.push(this.parseTableRow(this.lines[this.pos]));
+      this.pos++;
+    }
+
+    this.elements.push({ type: 'table', rows });
+  }
+
+  parseTableRow(line) {
+    return line.split('|')
+      .map(cell => cell.trim())
+      .filter((cell, idx, arr) => idx > 0 && idx < arr.length - 1 || cell !== '');
+  }
+
+  parseList(listType) {
+    const items = [];
+    const topPattern = listType === 'bullet' ? /^[-*+]\s+(.+)$/ : /^\d+\.\s+(.+)$/;
+
+    while (this.pos < this.lines.length) {
+      const line = this.lines[this.pos];
+      const topMatch = line.match(topPattern);
+
+      if (topMatch) {
+        // トップレベルのリスト項目
+        items.push({ text: topMatch[1], level: 0 });
+        this.pos++;
+      } else if (line.match(/^(\s+)[-*+]\s+(.+)$/)) {
+        // ネストされた箇条書き（インデントの深さでレベルを決定）
+        const match = line.match(/^(\s+)[-*+]\s+(.+)$/);
+        const indent = match[1].length;
+        // 2-3スペースでlevel 1、4-5スペースでlevel 2、以降も同様
+        const level = Math.min(Math.floor((indent + 1) / 2), 3);
+        items.push({ text: match[2], level: level });
+        this.pos++;
+      } else if (line.trim() === '') {
+        this.pos++;
+        break;
+      } else {
+        break;
+      }
+    }
+
+    this.elements.push({ type: 'list', listType, items });
+  }
+
+  parseBlockquote() {
+    const lines = [];
+    while (this.pos < this.lines.length && this.lines[this.pos].startsWith('>')) {
+      lines.push(this.lines[this.pos].replace(/^>\s?/, ''));
+      this.pos++;
+    }
+    this.elements.push({ type: 'blockquote', text: lines.join('\n') });
+  }
+
+  parseParagraph() {
+    const lines = [];
+    while (this.pos < this.lines.length) {
+      const line = this.lines[this.pos];
+      if (line.trim() === '' || line.startsWith('#') || line.startsWith('```') ||
+          line.match(/^[-*+]\s+/) || line.match(/^\d+\.\s+/) || line.startsWith('>')) {
+        break;
+      }
+      lines.push(line);
+      this.pos++;
+    }
+    if (lines.length > 0) {
+      this.elements.push({ type: 'paragraph', text: lines.join(' ') });
+    }
+  }
+}
+
+// ===== インラインマークアップ処理 =====
+function parseInlineMarkup(text, inputDir = null) {
+  const runs = [];
+  let remaining = text;
+
+  // 正規表現パターン
+  const patterns = [
+    { regex: /\*\*\*(.+?)\*\*\*/, style: { bold: true, italics: true } },
+    { regex: /\*\*(.+?)\*\*/, style: { bold: true } },
+    { regex: /\*(.+?)\*/, style: { italics: true } },
+    { regex: /__(.+?)__/, style: { bold: true } },
+    { regex: /_(.+?)_/, style: { italics: true } },
+    { regex: /~~(.+?)~~/, style: { strike: true } },
+    { regex: /`(.+?)`/, style: { shading: { fill: "E8E8E8", type: ShadingType.CLEAR } } }
+  ];
+
+  // imgタグのパターン
+  const imgPattern = /<img\s+[^>]*src=["']([^"']+)["'][^>]*>/i;
+
+  while (remaining.length > 0) {
+    let earliest = { index: remaining.length, length: 0, text: remaining, style: {}, type: 'text' };
+
+    // imgタグをチェック
+    const imgMatch = remaining.match(imgPattern);
+    if (imgMatch && imgMatch.index < earliest.index) {
+      const widthMatch = imgMatch[0].match(/width=["']?(\d+)["']?/i);
+      const heightMatch = imgMatch[0].match(/height=["']?(\d+)["']?/i);
+      earliest = {
+        index: imgMatch.index,
+        length: imgMatch[0].length,
+        src: imgMatch[1],
+        width: widthMatch ? parseInt(widthMatch[1]) : null,
+        height: heightMatch ? parseInt(heightMatch[1]) : null,
+        before: remaining.slice(0, imgMatch.index),
+        type: 'image'
+      };
+    }
+
+    // テキストパターンをチェック
+    for (const p of patterns) {
+      const match = remaining.match(p.regex);
+      if (match && match.index < earliest.index) {
+        earliest = {
+          index: match.index,
+          length: match[0].length,
+          text: match[1],
+          style: p.style,
+          before: remaining.slice(0, match.index),
+          type: 'text'
+        };
+      }
+    }
+
+    if (earliest.before) {
+      runs.push(new TextRun({ text: earliest.before, font: "Meiryo", size: 22 }));
+    }
+
+    if (earliest.index < remaining.length) {
+      if (earliest.type === 'image' && inputDir) {
+        // 画像を埋め込み
+        try {
+          const imgPath = path.isAbsolute(earliest.src) ? earliest.src : path.join(inputDir, earliest.src);
+          if (fs.existsSync(imgPath)) {
+            const imgData = fs.readFileSync(imgPath);
+            const ext = path.extname(imgPath).slice(1).toLowerCase();
+            const typeMap = { jpg: 'jpg', jpeg: 'jpg', png: 'png', gif: 'gif', bmp: 'bmp' };
+            const imgWidth = earliest.width || 24;
+            const imgHeight = earliest.height || earliest.width || 24;
+            runs.push(new ImageRun({
+              type: typeMap[ext] || 'png',
+              data: imgData,
+              transformation: { width: imgWidth, height: imgHeight }
+            }));
+          } else {
+            runs.push(new TextRun({ text: `[画像: ${earliest.src}]`, font: "Meiryo", size: 22, color: "FF0000" }));
+          }
+        } catch (e) {
+          runs.push(new TextRun({ text: `[画像エラー]`, font: "Meiryo", size: 22, color: "FF0000" }));
+        }
+      } else if (earliest.type === 'image') {
+        // inputDirがない場合はテキストで表示
+        runs.push(new TextRun({ text: `[画像]`, font: "Meiryo", size: 22 }));
+      } else {
+        runs.push(new TextRun({ text: earliest.text, font: "Meiryo", size: 22, ...earliest.style }));
+      }
+      remaining = remaining.slice(earliest.index + earliest.length);
+    } else {
+      if (remaining.length > 0) {
+        runs.push(new TextRun({ text: remaining, font: "Meiryo", size: 22 }));
+      }
+      break;
+    }
+  }
+
+  return runs.length > 0 ? runs : [new TextRun({ text: text, font: "Meiryo", size: 22 })];
+}
+
+// ===== ヘッダー生成 =====
+function createHeader(options) {
+  return new Header({
+    children: [
+      new Table({
+        columnWidths: [CONTENT_WIDTH / 2, CONTENT_WIDTH / 2],
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                borders: { top: {style: BorderStyle.NIL}, bottom: headerBorder, left: {style: BorderStyle.NIL}, right: {style: BorderStyle.NIL} },
+                width: { size: CONTENT_WIDTH / 2, type: WidthType.DXA },
+                children: [new Paragraph({
+                  children: [new TextRun({ text: `${options.title} ${options.doctype} Version ${options.version}`, size: 20, font: "Meiryo", color: "000000" })]
+                })]
+              }),
+              new TableCell({
+                borders: { top: {style: BorderStyle.NIL}, bottom: headerBorder, left: {style: BorderStyle.NIL}, right: {style: BorderStyle.NIL} },
+                width: { size: CONTENT_WIDTH / 2, type: WidthType.DXA },
+                children: [new Paragraph({
+                  alignment: AlignmentType.RIGHT,
+                  children: [new TextRun({ text: `文書管理番号:　${options.docnum}`, size: 20, font: "Meiryo", color: "000000" })]
+                })]
+              })
+            ]
+          })
+        ]
+      })
+    ]
+  });
+}
+
+// ===== フッター生成 =====
+function createFooter() {
+  return new Footer({
+    children: [new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({ text: "- ", font: "Meiryo" }),
+        new TextRun({ children: [PageNumber.CURRENT], font: "Meiryo" }),
+        new TextRun({ text: " -", font: "Meiryo" })
+      ]
+    })]
+  });
+}
+
+// ===== 表紙セクション =====
+function createCoverSection(options, inputDir) {
+  const children = [
+    new Paragraph({ spacing: { before: 2400 }, children: [] }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: `${options.title} ${options.subtitle}`, bold: true, color: "000000", font: "Meiryo", size: 48 })]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 240 },
+      children: [new TextRun({ text: options.doctype, color: "000000", font: "Meiryo", size: 36 })]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 480, after: 480 },
+      children: [new TextRun({ text: `Version ${options.version}`, font: "Meiryo", size: 28 })]
+    }),
+    new Paragraph({ spacing: { before: 1200 }, children: [] }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: options.date, color: "000000", font: "Meiryo", size: 24 })]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: options.company, color: "000000", font: "Meiryo", size: 24 })]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: options.dept, color: "000000", font: "Meiryo", size: 24 })]
+    })
+  ];
+
+  // ロゴ画像を追加
+  if (options.logo) {
+    try {
+      const logoPath = path.isAbsolute(options.logo) ? options.logo : path.join(inputDir, options.logo);
+      if (fs.existsSync(logoPath)) {
+        const logoData = fs.readFileSync(logoPath);
+        const ext = path.extname(logoPath).slice(1).toLowerCase();
+        const typeMap = { jpg: 'jpg', jpeg: 'jpg', png: 'png', gif: 'gif', bmp: 'bmp' };
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 480 },
+          children: [new ImageRun({
+            type: typeMap[ext] || 'png',
+            data: logoData,
+            transformation: { width: 150, height: 150 }
+          })]
+        }));
+      } else {
+        console.warn(`警告: ロゴ画像が見つかりません: ${logoPath}`);
+      }
+    } catch (e) {
+      console.warn(`警告: ロゴ画像の読み込みに失敗しました: ${e.message}`);
+    }
+  }
+
+  return {
+    properties: {
+      page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, size: { width: 11906, height: 16838 } }
+    },
+    headers: { default: createHeader(options) },
+    footers: { default: createFooter() },
+    children: children
+  };
+}
+
+// ===== 変更履歴の抽出 =====
+function extractChangelog(markdown) {
+  const changelogMatch = markdown.match(/<!--\s*CHANGELOG\s*-->([\s\S]*?)<!--\s*\/CHANGELOG\s*-->/);
+  if (!changelogMatch) {
+    return null;
+  }
+
+  const changelogContent = changelogMatch[1].trim();
+  const lines = changelogContent.split('\n').filter(line => line.trim());
+
+  // ヘッダー行と区切り行をスキップしてデータ行を取得
+  const dataRows = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    // 区切り行（|---|---|---|）をスキップ
+    if (line.match(/^\|[\s\-:|]+\|$/)) continue;
+    // ヘッダー行（最初のデータ行）をスキップ
+    if (i === 0 && line.includes('バージョン')) continue;
+
+    // テーブル行をパース
+    if (line.includes('|')) {
+      const cells = line.split('|').map(c => c.trim()).filter((c, idx, arr) => idx > 0 && idx < arr.length - 1 || c !== '');
+      if (cells.length >= 3) {
+        dataRows.push({
+          version: cells[0],
+          date: cells[1],
+          description: cells[2]
+        });
+      }
+    }
+  }
+
+  return dataRows.length > 0 ? dataRows : null;
+}
+
+// ===== 変更履歴セクション =====
+function createHistorySection(options, changelog) {
+  // 変更履歴データの準備
+  const historyData = changelog || [
+    { version: options.version, date: options.date, description: '初版作成' }
+  ];
+
+  // データ行を生成
+  const dataRows = historyData.map(item => new TableRow({
+    children: [
+      new TableCell({
+        borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
+        width: { size: 1800, type: WidthType.DXA },
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.version, font: "Meiryo", size: 20 })] })]
+      }),
+      new TableCell({
+        borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
+        width: { size: 2000, type: WidthType.DXA },
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.date, font: "Meiryo", size: 20 })] })]
+      }),
+      new TableCell({
+        borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
+        width: { size: 5226, type: WidthType.DXA },
+        children: [new Paragraph({ children: [new TextRun({ text: item.description, font: "Meiryo", size: 20 })] })]
+      })
+    ]
+  }));
+
+  return {
+    properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+    headers: { default: createHeader(options) },
+    footers: { default: createFooter() },
+    children: [
+      new Paragraph({ children: [new TextRun({ text: "[変更履歴]", bold: true, font: "Meiryo", size: 22 })] }),
+      new Table({
+        columnWidths: [1800, 2000, 5226],
+        rows: [
+          new TableRow({
+            tableHeader: true,
+            children: [
+              new TableCell({
+                borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
+                width: { size: 1800, type: WidthType.DXA },
+                shading: { fill: "538DD4", type: ShadingType.CLEAR },
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "バージョン", bold: true, font: "Meiryo", size: 20 })] })]
+              }),
+              new TableCell({
+                borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
+                width: { size: 2000, type: WidthType.DXA },
+                shading: { fill: "538DD4", type: ShadingType.CLEAR },
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "変更日付", bold: true, font: "Meiryo", size: 20 })] })]
+              }),
+              new TableCell({
+                borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
+                width: { size: 5226, type: WidthType.DXA },
+                shading: { fill: "538DD4", type: ShadingType.CLEAR },
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "変更事由", bold: true, font: "Meiryo", size: 20 })] })]
+              })
+            ]
+          }),
+          ...dataRows
+        ]
+      })
+    ]
+  };
+}
+
+// ===== 目次セクション =====
+function createTOCSection(options) {
+  return {
+    properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+    headers: { default: createHeader(options) },
+    footers: { default: createFooter() },
+    children: [
+      new Paragraph({ children: [new TextRun({ text: "目次", bold: true, font: "Meiryo", size: 28 })] }),
+      new TableOfContents("目次", { hyperlink: true, headingStyleRange: "1-3" })
+    ]
+  };
+}
+
+// ===== 本文要素をWord要素に変換 =====
+function convertElements(elements, options, inputDir) {
+  const children = [];
+  let bulletListRef = 0;
+  let numberListRef = 0;
+
+  for (const el of elements) {
+    switch (el.type) {
+      case 'heading':
+        const headingLevel = el.level <= 3 ? el.level : 3;
+        const headingMap = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 };
+        const sizeMap = { 1: 28, 2: 24, 3: 22 };
+        children.push(new Paragraph({
+          heading: headingMap[headingLevel],
+          children: [new TextRun({ text: el.text, bold: true, font: "Meiryo", size: sizeMap[headingLevel] })]
+        }));
+        break;
+
+      case 'paragraph':
+        children.push(new Paragraph({
+          children: parseInlineMarkup(el.text, inputDir)
+        }));
+        break;
+
+      case 'list':
+        const refName = el.listType === 'bullet' ? `bullet-${++bulletListRef}` : `number-${++numberListRef}`;
+        const nestedBulletRef = `nested-bullet-${bulletListRef}-${numberListRef}`;
+        for (const item of el.items) {
+          const itemText = typeof item === 'string' ? item : item.text;
+          const itemLevel = typeof item === 'string' ? 0 : item.level;
+          if (itemLevel === 0) {
+            // トップレベル（番号付きまたは箇条書き）
+            children.push(new Paragraph({
+              numbering: { reference: refName, level: 0 },
+              children: parseInlineMarkup(itemText, inputDir)
+            }));
+          } else {
+            // ネストされた箇条書き（レベルに応じたインデント）
+            const indentLeft = 720 + (itemLevel - 1) * 360;
+            children.push(new Paragraph({
+              numbering: { reference: nestedBulletRef, level: 0 },
+              indent: { left: indentLeft },
+              children: parseInlineMarkup(itemText, inputDir)
+            }));
+          }
+        }
+        break;
+
+      case 'code':
+        // コードブロックは背景色付きで表示
+        const codeLines = el.content.split('\n');
+        for (const codeLine of codeLines) {
+          children.push(new Paragraph({
+            shading: { fill: "F5F5F5", type: ShadingType.CLEAR },
+            indent: { left: 360 },
+            children: [new TextRun({ text: codeLine || ' ', font: "Meiryo", size: 20 })]
+          }));
+        }
+        break;
+
+      case 'table':
+        const colCount = el.rows[0]?.length || 1;
+        const colWidth = Math.floor(CONTENT_WIDTH / colCount);
+        
+        const tableRows = el.rows.map((row, rowIdx) => {
+          return new TableRow({
+            tableHeader: rowIdx === 0,
+            children: row.map(cell => new TableCell({
+              borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
+              width: { size: colWidth, type: WidthType.DXA },
+              shading: rowIdx === 0 ? { fill: "D9D9D9", type: ShadingType.CLEAR } : undefined,
+              children: [new Paragraph({
+                children: parseInlineMarkup(cell, inputDir)
+              })]
+            }))
+          });
+        });
+
+        children.push(new Table({
+          columnWidths: Array(colCount).fill(colWidth),
+          rows: tableRows
+        }));
+        break;
+
+      case 'blockquote':
+        children.push(new Paragraph({
+          indent: { left: 720 },
+          border: { left: { style: BorderStyle.SINGLE, size: 24, color: "CCCCCC" } },
+          children: [new TextRun({ text: el.text, italics: true, font: "Meiryo", size: 22 })]
+        }));
+        break;
+
+      case 'image':
+        try {
+          const imgPath = path.isAbsolute(el.src) ? el.src : path.join(inputDir, el.src);
+          if (fs.existsSync(imgPath)) {
+            const imgData = fs.readFileSync(imgPath);
+            const ext = path.extname(imgPath).slice(1).toLowerCase();
+            const typeMap = { jpg: 'jpg', jpeg: 'jpg', png: 'png', gif: 'gif', bmp: 'bmp' };
+            // width/heightが指定されていればそれを使用、なければデフォルト
+            const imgWidth = el.width || 400;
+            const imgHeight = el.height || (el.width ? Math.round(el.width * 0.75) : 300);
+            children.push(new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new ImageRun({
+                type: typeMap[ext] || 'png',
+                data: imgData,
+                transformation: { width: imgWidth, height: imgHeight },
+                altText: { title: el.alt || 'Image', description: el.alt || 'Image', name: el.alt || 'Image' }
+              })]
+            }));
+          } else {
+            children.push(new Paragraph({
+              children: [new TextRun({ text: `[画像: ${el.src}]`, font: "Meiryo", size: 22, color: "FF0000" })]
+            }));
+          }
+        } catch (e) {
+          children.push(new Paragraph({
+            children: [new TextRun({ text: `[画像読み込みエラー: ${el.src}]`, font: "Meiryo", size: 22, color: "FF0000" })]
+          }));
+        }
+        break;
+
+      case 'hr':
+        children.push(new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" } },
+          children: []
+        }));
+        break;
+    }
+  }
+
+  return children;
+}
+
+// ===== メイン処理 =====
+async function main() {
+  const options = parseArgs();
+  
+  // Markdownファイル読み込み
+  const markdownRaw = fs.readFileSync(options.input, 'utf-8');
+  const inputDir = path.dirname(path.resolve(options.input));
+
+  // 変更履歴を抽出
+  const changelog = extractChangelog(markdownRaw);
+
+  // CHANGELOGブロックを本文から除外
+  const markdown = markdownRaw.replace(/<!--\s*CHANGELOG\s*-->[\s\S]*?<!--\s*\/CHANGELOG\s*-->\s*/, '');
+
+  // パース
+  const parser = new MarkdownParser(markdown);
+  const elements = parser.parse();
+  
+  // 番号付きリストの設定を動的に生成
+  const numberConfigs = [];
+  const bulletConfigs = [];
+  const nestedBulletConfigs = [];
+  let bulletCount = 0;
+  let numberCount = 0;
+
+  for (const el of elements) {
+    if (el.type === 'list') {
+      if (el.listType === 'bullet') {
+        bulletCount++;
+        bulletConfigs.push({
+          reference: `bullet-${bulletCount}`,
+          levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT,
+            style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
+        });
+      } else {
+        numberCount++;
+        numberConfigs.push({
+          reference: `number-${numberCount}`,
+          levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT,
+            style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
+        });
+      }
+      // ネストされた箇条書き用の設定を追加
+      nestedBulletConfigs.push({
+        reference: `nested-bullet-${bulletCount}-${numberCount}`,
+        levels: [{ level: 0, format: LevelFormat.BULLET, text: "-", alignment: AlignmentType.LEFT,
+          style: { paragraph: { indent: { left: 1080, hanging: 360 } } } }]
+      });
+    }
+  }
+
+  // Word要素に変換
+  const contentChildren = convertElements(elements, options, inputDir);
+
+  // ドキュメント生成
+  const doc = new Document({
+    styles: {
+      default: { document: { run: { font: "Meiryo", size: 22 } } },
+      paragraphStyles: [
+        { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true,
+          run: { size: 28, bold: true, color: "000000", font: "Meiryo" },
+          paragraph: { spacing: { before: 360, after: 240 }, outlineLevel: 0 } },
+        { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
+          run: { size: 24, bold: true, color: "000000", font: "Meiryo" },
+          paragraph: { spacing: { before: 240, after: 180 }, outlineLevel: 1 } },
+        { id: "Heading3", name: "Heading 3", basedOn: "Normal", next: "Normal", quickFormat: true,
+          run: { size: 22, bold: true, color: "000000", font: "Meiryo" },
+          paragraph: { spacing: { before: 180, after: 120 }, outlineLevel: 2 } }
+      ]
+    },
+    numbering: { config: [...bulletConfigs, ...numberConfigs, ...nestedBulletConfigs] },
+    sections: [
+      createCoverSection(options, inputDir),
+      createHistorySection(options, changelog),
+      createTOCSection(options),
+      {
+        properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+        headers: { default: createHeader(options) },
+        footers: { default: createFooter() },
+        children: contentChildren
+      }
+    ]
+  });
+
+  // 保存
+  const buffer = await Packer.toBuffer(doc);
+  fs.writeFileSync(options.output, buffer);
+  console.log(`✓ 変換完了: ${options.output}`);
+}
+
+main().catch(err => {
+  console.error('エラー:', err.message);
+  process.exit(1);
+});

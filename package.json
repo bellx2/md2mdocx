@@ -1,0 +1,13 @@
+{
+  "name": "md2mdocx",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "private": true,
+  "dependencies": {
+    "docx": "^9.5.1"
+  }
+}
