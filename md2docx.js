@@ -607,46 +607,58 @@ function createTOCSection(options) {
 // ===== 本文要素をWord要素に変換 =====
 function convertElements(elements, options, inputDir) {
   const children = [];
-  let bulletListRef = 0;
   let numberListRef = 0;
+  let currentSectionIndent = 0; // 現在のセクションのインデント
 
   for (const el of elements) {
     switch (el.type) {
       case 'heading':
         const headingLevel = el.level <= 3 ? el.level : 3;
-        const headingMap = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 };
         const sizeMap = { 1: 28, 2: 24, 3: 22 };
+        const spacingMap = { 1: { before: 360, after: 240 }, 2: { before: 240, after: 180 }, 3: { before: 180, after: 120 } };
+        // #はインデントなし、##以降は360
+        currentSectionIndent = el.level === 1 ? 0 : 360;
         children.push(new Paragraph({
-          heading: headingMap[headingLevel],
+          spacing: spacingMap[headingLevel],
+          indent: { left: currentSectionIndent },
+          outlineLevel: headingLevel - 1,
           children: [new TextRun({ text: el.text, bold: true, font: "Meiryo", size: sizeMap[headingLevel] })]
         }));
         break;
 
       case 'paragraph':
         children.push(new Paragraph({
+          indent: { left: currentSectionIndent },
           children: parseInlineMarkup(el.text, inputDir)
         }));
         break;
 
       case 'list':
-        const refName = el.listType === 'bullet' ? `bullet-${++bulletListRef}` : `number-${++numberListRef}`;
-        const nestedBulletRef = `nested-bullet-${bulletListRef}-${numberListRef}`;
+        // 番号付きリストのカウント
+        if (el.listType === 'number') numberListRef++;
+        const listRef = `number-${numberListRef}-indent${currentSectionIndent}`;
+
         for (const item of el.items) {
           const itemText = typeof item === 'string' ? item : item.text;
           const itemLevel = typeof item === 'string' ? 0 : item.level;
-          if (itemLevel === 0) {
-            // トップレベル（番号付きまたは箇条書き）
+          const baseIndent = currentSectionIndent + 720;
+          const itemIndent = baseIndent + itemLevel * 360;
+
+          if (el.listType === 'number' && itemLevel === 0) {
+            // 番号付きリストはnumberingを使用
             children.push(new Paragraph({
-              numbering: { reference: refName, level: 0 },
+              numbering: { reference: listRef, level: 0 },
               children: parseInlineMarkup(itemText, inputDir)
             }));
           } else {
-            // ネストされた箇条書き（レベルに応じたインデント）
-            const indentLeft = 720 + (itemLevel - 1) * 360;
+            // 箇条書きはテキストで記号を追加
+            const bullet = el.listType === 'bullet' ? (itemLevel === 0 ? '・' : '-') : '-';
             children.push(new Paragraph({
-              numbering: { reference: nestedBulletRef, level: 0 },
-              indent: { left: indentLeft },
-              children: parseInlineMarkup(itemText, inputDir)
+              indent: { left: itemIndent, hanging: 360 },
+              children: [
+                new TextRun({ text: bullet + '\t', font: "Meiryo", size: 22 }),
+                ...parseInlineMarkup(itemText, inputDir)
+              ]
             }));
           }
         }
@@ -658,7 +670,7 @@ function convertElements(elements, options, inputDir) {
         for (const codeLine of codeLines) {
           children.push(new Paragraph({
             shading: { fill: "F5F5F5", type: ShadingType.CLEAR },
-            indent: { left: 360 },
+            indent: { left: currentSectionIndent + 360 },
             children: [new TextRun({ text: codeLine || ' ', font: "Meiryo", size: 20 })]
           }));
         }
@@ -666,8 +678,9 @@ function convertElements(elements, options, inputDir) {
 
       case 'table':
         const colCount = el.rows[0]?.length || 1;
-        const colWidth = Math.floor(CONTENT_WIDTH / colCount);
-        
+        const tableWidth = CONTENT_WIDTH - currentSectionIndent;
+        const colWidth = Math.floor(tableWidth / colCount);
+
         const tableRows = el.rows.map((row, rowIdx) => {
           return new TableRow({
             tableHeader: rowIdx === 0,
@@ -684,13 +697,15 @@ function convertElements(elements, options, inputDir) {
 
         children.push(new Table({
           columnWidths: Array(colCount).fill(colWidth),
-          rows: tableRows
+          rows: tableRows,
+          width: { size: tableWidth, type: WidthType.DXA },
+          indent: { size: currentSectionIndent, type: WidthType.DXA }
         }));
         break;
 
       case 'blockquote':
         children.push(new Paragraph({
-          indent: { left: 720 },
+          indent: { left: currentSectionIndent + 720 },
           border: { left: { style: BorderStyle.SINGLE, size: 24, color: "CCCCCC" } },
           children: [new TextRun({ text: el.text, italics: true, font: "Meiryo", size: 22 })]
         }));
@@ -707,6 +722,7 @@ function convertElements(elements, options, inputDir) {
             const imgWidth = el.width || 400;
             const imgHeight = el.height || (el.width ? Math.round(el.width * 0.75) : 300);
             children.push(new Paragraph({
+              indent: { left: currentSectionIndent },
               alignment: AlignmentType.CENTER,
               children: [new ImageRun({
                 type: typeMap[ext] || 'png',
@@ -717,11 +733,13 @@ function convertElements(elements, options, inputDir) {
             }));
           } else {
             children.push(new Paragraph({
+              indent: { left: currentSectionIndent },
               children: [new TextRun({ text: `[画像: ${el.src}]`, font: "Meiryo", size: 22, color: "FF0000" })]
             }));
           }
         } catch (e) {
           children.push(new Paragraph({
+            indent: { left: currentSectionIndent },
             children: [new TextRun({ text: `[画像読み込みエラー: ${el.src}]`, font: "Meiryo", size: 22, color: "FF0000" })]
           }));
         }
@@ -729,6 +747,7 @@ function convertElements(elements, options, inputDir) {
 
       case 'hr':
         children.push(new Paragraph({
+          indent: { left: currentSectionIndent },
           border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" } },
           children: []
         }));
@@ -757,35 +776,21 @@ async function main() {
   const parser = new MarkdownParser(markdown);
   const elements = parser.parse();
   
-  // 番号付きリストの設定を動的に生成
+  // 番号付きリストの設定を動的に生成（#はインデントなし、##以降は360）
   const numberConfigs = [];
-  const bulletConfigs = [];
-  const nestedBulletConfigs = [];
-  let bulletCount = 0;
-  let numberCount = 0;
+  let listCount = 0;
+  let currentIndent = 0;
 
   for (const el of elements) {
-    if (el.type === 'list') {
-      if (el.listType === 'bullet') {
-        bulletCount++;
-        bulletConfigs.push({
-          reference: `bullet-${bulletCount}`,
-          levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT,
-            style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
-        });
-      } else {
-        numberCount++;
-        numberConfigs.push({
-          reference: `number-${numberCount}`,
-          levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT,
-            style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
-        });
-      }
-      // ネストされた箇条書き用の設定を追加
-      nestedBulletConfigs.push({
-        reference: `nested-bullet-${bulletCount}-${numberCount}`,
-        levels: [{ level: 0, format: LevelFormat.BULLET, text: "-", alignment: AlignmentType.LEFT,
-          style: { paragraph: { indent: { left: 1080, hanging: 360 } } } }]
+    if (el.type === 'heading') {
+      currentIndent = el.level === 1 ? 0 : 360;
+    }
+    if (el.type === 'list' && el.listType === 'number') {
+      listCount++;
+      numberConfigs.push({
+        reference: `number-${listCount}-indent${currentIndent}`,
+        levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT,
+          style: { paragraph: { indent: { left: currentIndent + 720, hanging: 360 } } } }]
       });
     }
   }
@@ -809,7 +814,7 @@ async function main() {
           paragraph: { spacing: { before: 180, after: 120 }, outlineLevel: 2 } }
       ]
     },
-    numbering: { config: [...bulletConfigs, ...numberConfigs, ...nestedBulletConfigs] },
+    numbering: { config: numberConfigs },
     sections: [
       createCoverSection(options, inputDir),
       createHistorySection(options, changelog),
