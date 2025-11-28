@@ -2,6 +2,8 @@
 
 Convert Markdown to manual-style Word documents (docx). Generates clean, professional documentation with cover pages, change history, and table of contents.
 
+output sample： [md2docx-sample](./sample/sample.pdf)
+
 ## Features
 
 - Auto-generates cover page, change history, and table of contents

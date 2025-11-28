@@ -8,8 +8,8 @@ SUBTITLE =
 DOCTYPE = ユーザーマニュアル
 VERSION = 1.0.0
 DATE = 2025年11月28日
-DEPT = 開発部
-DOCNUM = DEMO-MANUAL-120
+DEPT = システム開発部
+DOCNUM = SAMPLE-APP-100
 LOGO = logo.png
 COMPANY = サンプル株式会社
 
