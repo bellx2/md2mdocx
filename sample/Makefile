@@ -18,8 +18,8 @@ COMPANY = サンプル株式会社
 all: $(OUTPUT_DOCX)
 
 # Word文書の生成
-$(OUTPUT_DOCX): $(INPUT_MD) ../md2docx.js
-	bun ../md2docx.js $(INPUT_MD) $(OUTPUT_DOCX) \
+$(OUTPUT_DOCX): $(INPUT_MD) ../md2mdocx.js
+	bun ../md2mdocx.js $(INPUT_MD) $(OUTPUT_DOCX) \
 		--title "$(TITLE)" \
 		--subtitle "$(SUBTITLE)" \
 		--doctype "$(DOCTYPE)" \

@@ -75,6 +75,16 @@ You can also specify size using HTML img tags:
 <img src="icon.png" width="24" height="24">
 ```
 
+## Notes
+
+### Opening Generated Documents
+
+When opening the generated Word document, you may see a dialog:
+
+> "This document contains fields that may refer to other files. Do you want to update the fields in this document?"
+
+This is because the document contains fields such as table of contents (TOC) and page numbers. Select **Yes** to update them to the latest state.
+
 ## License
 
 MIT
