@@ -1,95 +1,80 @@
 # md2mdocx
 
-Markdownをマニュアル形式のWord文書(docx)に変換するツールです。そこそこ綺麗なマニュアル形式のドキュメントに変換します。
+Convert Markdown to manual-style Word documents (docx). Generates clean, professional documentation with cover pages, change history, and table of contents.
 
-## 機能
+## Features
 
-- 表紙、変更履歴、目次を自動生成
-- ヘッダー/フッター付き
-- 見出し、箇条書き、テーブル、コードブロック、画像に対応
-- インラインマークアップ(太字、斜体、取り消し線、インラインコード)
+- Auto-generates cover page, change history, and table of contents
+- Headers and footers included
+- Supports headings, lists, tables, code blocks, and images
+- Inline markup (bold, italic, strikethrough, inline code)
 
-## インストール
+## Installation
 
 ```bash
-bun install
+npm install -g md2mdocx
 ```
 
-## 使い方
+## Usage
 
-### 基本
+### Basic
 
 ```bash
-bun md2docx.js input.md output.docx
+md2mdocx input.md output.docx
 ```
 
-### オプション
+### Options
 
-| オプション | 説明 | デフォルト値 |
-|-----------|------|-------------|
-| `--title` | 製品名/タイトル | 製品名 |
-| `--subtitle` | サブタイトル | マニュアル |
-| `--doctype` | 文書種別 | 操作マニュアル |
-| `--version` | バージョン | 1.0.0 |
-| `--date` | 作成日 | 今日の日付 |
-| `--dept` | 部署名 | 技術開発部 |
-| `--docnum` | 文書管理番号 | DOC-001 |
-| `--logo` | ロゴ画像パス | なし |
-| `--company` | 会社名 | サンプル株式会社 |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--title` | Product name/title | 製品名 |
+| `--subtitle` | Subtitle | マニュアル |
+| `--doctype` | Document type | 操作マニュアル |
+| `--version` | Version | 1.0.0 |
+| `--date` | Creation date | Today's date |
+| `--dept` | Department name | 技術開発部 |
+| `--docnum` | Document number | DOC-001 |
+| `--logo` | Logo image path | None |
+| `--company` | Company name | サンプル株式会社 |
 
-### 使用例
+### Example
 
 ```bash
-bun md2docx.js manual.md manual.docx \
+md2mdocx manual.md manual.docx \
   --title "MyApp" \
-  --doctype "ユーザーマニュアル" \
+  --doctype "User Manual" \
   --version "2.0.0" \
-  --company "株式会社ABC" \
-  --dept "開発部"
+  --company "ABC Corp" \
+  --dept "Development"
 ```
 
-## Makefileを使う場合
+## Markdown Syntax
 
-```bash
-# デフォルト設定で変換
-make
+### Change History
 
-# カスタマイズ
-make TITLE="製品名" VERSION="2.0.0" COMPANY="株式会社ABC"
-
-# クリーン
-make clean
-
-# 再生成
-make rebuild
-
-# ヘルプ
-make help
-```
-
-## Markdown記法
-
-### 変更履歴
-
-Markdown内にHTMLコメントで変更履歴を記述できる。
+You can include change history in your Markdown using HTML comments:
 
 ```markdown
 <!-- CHANGELOG -->
-| バージョン | 変更日付 | 変更事由 |
-|-----------|---------|---------|
-| 1.0.0 | 2025年1月1日 | 初版作成 |
-| 1.1.0 | 2025年2月1日 | 機能追加 |
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | Jan 1, 2025 | Initial release |
+| 1.1.0 | Feb 1, 2025 | Added features |
 <!-- /CHANGELOG -->
 ```
 
-### 画像
+### Images
 
 ```markdown
-![代替テキスト](path/to/image.png)
+![Alt text](path/to/image.png)
 ```
 
-HTMLのimgタグでサイズ指定も可能。
+You can also specify size using HTML img tags:
 
 ```html
 <img src="icon.png" width="24" height="24">
 ```
+
+## License
+
+MIT
