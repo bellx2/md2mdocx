@@ -612,19 +612,21 @@ function convertElements(elements, options, inputDir) {
 
   for (const el of elements) {
     switch (el.type) {
-      case 'heading':
+      case 'heading': {
         const headingLevel = el.level <= 3 ? el.level : 3;
         const sizeMap = { 1: 28, 2: 24, 3: 22 };
         const spacingMap = { 1: { before: 360, after: 240 }, 2: { before: 240, after: 180 }, 3: { before: 180, after: 120 } };
+        const headingStyleMap = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 };
         // #はインデントなし、##以降は360
         currentSectionIndent = el.level === 1 ? 0 : 360;
         children.push(new Paragraph({
+          heading: headingStyleMap[headingLevel],
           spacing: spacingMap[headingLevel],
           indent: { left: currentSectionIndent },
-          outlineLevel: headingLevel - 1,
           children: [new TextRun({ text: el.text, bold: true, font: "Meiryo", size: sizeMap[headingLevel] })]
         }));
         break;
+      }
 
       case 'paragraph':
         children.push(new Paragraph({
