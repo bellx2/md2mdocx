@@ -1,13 +1,39 @@
 {
   "name": "md2mdocx",
-  "devDependencies": {
-    "@types/bun": "latest"
+  "version": "1.0.0",
+  "description": "Convert Markdown to manual-style Word documents (docx)",
+  "main": "md2docx.js",
+  "bin": {
+    "md2mdocx": "./md2docx.js"
   },
-  "peerDependencies": {
-    "typescript": "^5"
+  "scripts": {
+    "start": "node md2docx.js"
   },
-  "private": true,
+  "keywords": [
+    "markdown",
+    "docx",
+    "word",
+    "converter",
+    "manual",
+    "document"
+  ],
+  "author": "Bellx2 <bellx2@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "md2docx.js",
+    "README.md"
+  ],
   "dependencies": {
     "docx": "^9.5.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
   }
 }
