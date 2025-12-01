@@ -25,7 +25,7 @@
 | Webサーバー | ユーザーインターフェース | nginx |
 | APIサーバー | ビジネスロジック | Node.js |
 | データベース | データ永続化 | PostgreSQL |
-<br>
+
 ```mermaid
 flowchart LR
 a[ユーザー] --> b[Webサーバー]
