@@ -38,6 +38,20 @@ md2mdocx input.md output.docx
 | `--docnum` | Document number | DOC-001 |
 | `--logo` | Logo image path | None |
 | `--company` | Company name | サンプル株式会社 |
+| `--theme` | Color theme | blue |
+
+#### Theme Options
+
+| Theme | Description | Mermaid Theme |
+|-------|-------------|---------------|
+| `blue` | Blue accent (default) | default |
+| `orange` | Orange accent | neutral |
+| `green` | Green accent | forest |
+
+The theme affects:
+- Header border line color
+- Change history table header background color
+- Mermaid diagram color scheme
 
 ### Example
 
@@ -47,7 +61,8 @@ md2mdocx manual.md manual.docx \
   --doctype "User Manual" \
   --version "2.0.0" \
   --company "ABC Corp" \
-  --dept "Development"
+  --dept "Development" \
+  --theme green
 ```
 
 ## Markdown Syntax

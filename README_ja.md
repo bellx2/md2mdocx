@@ -40,6 +40,20 @@ bun md2docx.js input.md output.docx
 | `--docnum` | 文書管理番号 | DOC-001 |
 | `--logo` | ロゴ画像パス | なし |
 | `--company` | 会社名 | サンプル株式会社 |
+| `--theme` | カラーテーマ | blue |
+
+#### テーマオプション
+
+| テーマ | 説明 | Mermaidテーマ |
+|-------|------|---------------|
+| `blue` | 青系（デフォルト） | default |
+| `orange` | オレンジ系 | neutral |
+| `green` | 緑系 | forest |
+
+テーマは以下に適用されます:
+- ヘッダー下線の色
+- 変更履歴テーブルのヘッダー背景色
+- Mermaid図の配色
 
 ### 使用例
 
@@ -49,7 +63,8 @@ bun md2docx.js manual.md manual.docx \
   --doctype "ユーザーマニュアル" \
   --version "2.0.0" \
   --company "株式会社ABC" \
-  --dept "開発部"
+  --dept "開発部" \
+  --theme green
 ```
 
 ## Makefileを使う場合

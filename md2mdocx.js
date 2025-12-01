@@ -2,7 +2,7 @@
 /**
  * Markdown to Word Converter
  * マニュアルテンプレート形式
- * 
+ *
  * Usage: bun md2docx.js input.md output.docx [options]
  * Options:
  *   --title "製品名"
@@ -14,6 +14,7 @@
  *   --docnum "DOC-001"
  *   --logo "logo.png"
  *   --company "会社名"
+ *   --theme "blue|orange|green"  (差し色テーマ)
  */
 
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Header, Footer,
@@ -26,8 +27,35 @@ const path = require('path');
 const PAGE_WIDTH = 11906;
 const MARGIN = 1440;
 const CONTENT_WIDTH = PAGE_WIDTH - (MARGIN * 2);
-const headerBorder = { style: BorderStyle.SINGLE, size: 24, color: "2F4F76" };
 const tableBorder = { style: BorderStyle.SINGLE, size: 1, color: "000000" };
+
+// ===== テーマカラー設定 =====
+const THEME_COLORS = {
+  blue: {
+    headerBorder: "2F4F76",    // 濃い青（ヘッダー下線）
+    tableHeader: "538DD4",     // 明るい青（変更履歴テーブルヘッダー）
+    mermaid: "default"         // Mermaidテーマ
+  },
+  orange: {
+    headerBorder: "B45F06",    // 濃いオレンジ（ヘッダー下線）
+    tableHeader: "F6B26B",     // 明るいオレンジ（変更履歴テーブルヘッダー）
+    mermaid: "neutral"         // Mermaidテーマ（オレンジに近いグレー系）
+  },
+  green: {
+    headerBorder: "38761D",    // 濃い緑（ヘッダー下線）
+    tableHeader: "93C47D",     // 明るい緑（変更履歴テーブルヘッダー）
+    mermaid: "forest"          // Mermaidテーマ
+  }
+};
+
+/**
+ * テーマカラーを取得
+ * @param {string} theme - テーマ名 (blue, orange, green)
+ * @returns {object} - カラー設定
+ */
+function getThemeColors(theme) {
+  return THEME_COLORS[theme] || THEME_COLORS.blue;
+}
 
 // ===== Mermaid設定 =====
 const MERMAID_IMAGE_WIDTH = 600;
@@ -52,13 +80,19 @@ function getPngDimensions(pngData) {
 /**
  * Kroki APIを使用してMermaid図をPNG画像に変換
  * @param {string} diagramSource - Mermaidダイアグラムのソースコード
+ * @param {string} mermaidTheme - Mermaidテーマ名 (default, neutral, dark, forest, base)
  * @returns {Promise<Buffer|null>} - PNG画像のバイナリデータ、失敗時はnull
  */
-async function renderMermaidToPng(diagramSource) {
+async function renderMermaidToPng(diagramSource, mermaidTheme = 'default') {
   const https = require('https');
 
+  // テーマ設定をダイアグラムの先頭に追加（既存のinit設定がない場合）
+  let postData = diagramSource;
+  if (!diagramSource.includes('%%{init:')) {
+    postData = `%%{init: {'theme': '${mermaidTheme}'}}%%\n${diagramSource}`;
+  }
+
   return new Promise((resolve) => {
-    const postData = diagramSource;
     const options = {
       hostname: 'kroki.io',
       port: 443,
@@ -101,9 +135,10 @@ async function renderMermaidToPng(diagramSource) {
 /**
  * すべてのMermaid図を事前レンダリング
  * @param {Array} elements - パース済み要素の配列
+ * @param {string} mermaidTheme - Mermaidテーマ名
  * @returns {Promise<Map<string, Buffer>>} - ダイアグラムソースをキーとするPNGデータのMap
  */
-async function prerenderMermaidDiagrams(elements) {
+async function prerenderMermaidDiagrams(elements, mermaidTheme = 'default') {
   const mermaidElements = elements.filter(
     el => el.type === 'code' && el.language === 'mermaid'
   );
@@ -113,7 +148,7 @@ async function prerenderMermaidDiagrams(elements) {
   for (const el of mermaidElements) {
     if (!renderedMap.has(el.content)) {
       console.log('Mermaid図をレンダリング中...');
-      const imageData = await renderMermaidToPng(el.content);
+      const imageData = await renderMermaidToPng(el.content, mermaidTheme);
       renderedMap.set(el.content, imageData);
     }
   }
@@ -135,7 +170,8 @@ function parseArgs() {
     dept: "技術開発部",
     docnum: "DOC-001",
     logo: null,
-    company: "サンプル株式会社"
+    company: "サンプル株式会社",
+    theme: "blue"
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -153,8 +189,15 @@ function parseArgs() {
 
   if (!options.input) {
     console.error('Usage: node md2docx.js input.md output.docx [options]');
-    console.error('Options: --title, --subtitle, --doctype, --version, --date, --dept, --docnum, --logo, --company');
+    console.error('Options: --title, --subtitle, --doctype, --version, --date, --dept, --docnum, --logo, --company, --theme');
+    console.error('Theme: blue (default), orange, green');
     process.exit(1);
+  }
+
+  // テーマの検証
+  if (!THEME_COLORS[options.theme]) {
+    console.warn(`警告: 不明なテーマ "${options.theme}"。デフォルトの "blue" を使用します。`);
+    options.theme = "blue";
   }
 
   if (!options.output) {
@@ -492,6 +535,9 @@ function parseInlineMarkup(text, inputDir = null) {
 
 // ===== ヘッダー生成 =====
 function createHeader(options) {
+  const colors = getThemeColors(options.theme);
+  const headerBorder = { style: BorderStyle.SINGLE, size: 24, color: colors.headerBorder };
+
   return new Header({
     children: [
       new Table({
@@ -641,6 +687,8 @@ function extractChangelog(markdown) {
 
 // ===== 変更履歴セクション =====
 function createHistorySection(options, changelog) {
+  const colors = getThemeColors(options.theme);
+
   // 変更履歴データの準備
   const historyData = changelog || [
     { version: options.version, date: options.date, description: '初版作成' }
@@ -682,19 +730,19 @@ function createHistorySection(options, changelog) {
               new TableCell({
                 borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
                 width: { size: 1800, type: WidthType.DXA },
-                shading: { fill: "538DD4", type: ShadingType.CLEAR },
+                shading: { fill: colors.tableHeader, type: ShadingType.CLEAR },
                 children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "バージョン", bold: true, font: "Meiryo", size: 20 })] })]
               }),
               new TableCell({
                 borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
                 width: { size: 2000, type: WidthType.DXA },
-                shading: { fill: "538DD4", type: ShadingType.CLEAR },
+                shading: { fill: colors.tableHeader, type: ShadingType.CLEAR },
                 children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "変更日付", bold: true, font: "Meiryo", size: 20 })] })]
               }),
               new TableCell({
                 borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
                 width: { size: 5226, type: WidthType.DXA },
-                shading: { fill: "538DD4", type: ShadingType.CLEAR },
+                shading: { fill: colors.tableHeader, type: ShadingType.CLEAR },
                 children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "変更事由", bold: true, font: "Meiryo", size: 20 })] })]
               })
             ]
@@ -955,8 +1003,9 @@ async function main() {
   const parser = new MarkdownParser(markdown);
   const elements = parser.parse();
 
-  // Mermaid図の事前レンダリング
-  const mermaidRenderedMap = await prerenderMermaidDiagrams(elements);
+  // Mermaid図の事前レンダリング（テーマ適用）
+  const colors = getThemeColors(options.theme);
+  const mermaidRenderedMap = await prerenderMermaidDiagrams(elements, colors.mermaid);
 
   // 番号付きリストの設定を動的に生成（#はインデントなし、##以降は360）
   const numberConfigs = [];
