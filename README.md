@@ -77,6 +77,21 @@ You can also specify size using HTML img tags:
 <img src="icon.png" width="24" height="24">
 ```
 
+### Line Breaks and Page Breaks
+
+```markdown
+This is line 1.<br>This is line 2.
+
+<pagebreak>
+
+This content appears on a new page.
+```
+
+| Syntax | Effect |
+|--------|--------|
+| `<br>` | Force line break within paragraph |
+| `<pagebreak>` | Force page break |
+
 ### Mermaid Diagrams
 
 Mermaid code blocks are automatically converted to PNG images using [Kroki](https://kroki.io) API:

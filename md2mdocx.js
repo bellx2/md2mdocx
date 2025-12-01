@@ -188,6 +188,13 @@ class MarkdownParser {
         continue;
       }
 
+      // 強制改ページ
+      if (line.match(/^<pagebreak\s*\/?>$/i)) {
+        this.elements.push({ type: 'pagebreak' });
+        this.pos++;
+        continue;
+      }
+
       // 見出し
       const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
       if (headingMatch) {
@@ -388,9 +395,22 @@ function parseInlineMarkup(text, inputDir = null) {
 
   // imgタグのパターン
   const imgPattern = /<img\s+[^>]*src=["']([^"']+)["'][^>]*>/i;
+  // brタグのパターン
+  const brPattern = /<br\s*\/?>/i;
 
   while (remaining.length > 0) {
     let earliest = { index: remaining.length, length: 0, text: remaining, style: {}, type: 'text' };
+
+    // brタグをチェック
+    const brMatch = remaining.match(brPattern);
+    if (brMatch && brMatch.index < earliest.index) {
+      earliest = {
+        index: brMatch.index,
+        length: brMatch[0].length,
+        before: remaining.slice(0, brMatch.index),
+        type: 'break'
+      };
+    }
 
     // imgタグをチェック
     const imgMatch = remaining.match(imgPattern);
@@ -428,7 +448,10 @@ function parseInlineMarkup(text, inputDir = null) {
     }
 
     if (earliest.index < remaining.length) {
-      if (earliest.type === 'image' && inputDir) {
+      if (earliest.type === 'break') {
+        // 強制改行
+        runs.push(new TextRun({ break: 1 }));
+      } else if (earliest.type === 'image' && inputDir) {
         // 画像を埋め込み
         try {
           const imgPath = path.isAbsolute(earliest.src) ? earliest.src : path.join(inputDir, earliest.src);
@@ -900,6 +923,12 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
           indent: { left: currentSectionIndent },
           border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" } },
           children: []
+        }));
+        break;
+
+      case 'pagebreak':
+        children.push(new Paragraph({
+          children: [new PageBreak()]
         }));
         break;
     }

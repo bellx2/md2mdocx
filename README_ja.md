@@ -98,6 +98,21 @@ HTMLのimgタグでサイズ指定も可能。
 <img src="icon.png" width="24" height="24">
 ```
 
+### 強制改行・強制改ページ
+
+```markdown
+これは1行目です。<br>これは2行目です。
+
+<pagebreak>
+
+ここから新しいページです。
+```
+
+| 記法 | 効果 |
+|------|------|
+| `<br>` | 段落内で強制改行 |
+| `<pagebreak>` | 強制改ページ |
+
 ### Mermaid図
 
 Mermaidコードブロックは[Kroki](https://kroki.io) APIを使用してPNG画像に自動変換されます。

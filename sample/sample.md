@@ -25,7 +25,7 @@
 | Webサーバー | ユーザーインターフェース | nginx |
 | APIサーバー | ビジネスロジック | Node.js |
 | データベース | データ永続化 | PostgreSQL |
-
+<br>
 ```mermaid
 graph LR;
   A[ユーザー] -->|HTTPリクエスト| B[Webサーバ
@@ -48,9 +48,7 @@ graph LR;
 
 対応OSは以下の通りです：
 
-- Windows 10/11
-- macOS 12以降
-- Ubuntu 20.04 LTS以降
+- macOS 10.15以降
 
 # 3. インストール
 
@@ -89,6 +87,7 @@ database:
   name: sampleapp
 ```
 
+<pagebreak>
 # 4. 操作方法
 
 ## 4.1. ログイン
@@ -113,6 +112,7 @@ database:
 
 検索条件には**ワイルドカード**（`*`）が使用できます。
 
+<pagebreak>
 # 5. トラブルシューティング
 
 ## 5.1. よくある問題
