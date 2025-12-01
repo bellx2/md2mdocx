@@ -11,17 +11,23 @@ output sample： [md2docx-sample](./sample/sample.pdf)
 - Supports headings, lists, tables, code blocks, and images
 - Inline markup (bold, italic, strikethrough, inline code)
 
-## Installation
+## Usage
+
+### Quick Start (Recommended)
+
+No installation required. Use `npx` or `bunx`:
+
+```bash
+npx md2mdocx input.md output.docx
+# or
+bunx md2mdocx input.md output.docx
+```
+
+### Global Installation
 
 ```bash
 npm install -g md2mdocx
-```
-
-## Usage
-
-### Basic
-
-```bash
+# then
 md2mdocx input.md output.docx
 ```
 
@@ -56,7 +62,7 @@ The theme affects:
 ### Example
 
 ```bash
-md2mdocx manual.md manual.docx \
+npx md2mdocx manual.md manual.docx \
   --title "MyApp" \
   --doctype "User Manual" \
   --version "2.0.0" \

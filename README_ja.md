@@ -13,18 +13,24 @@ Markdownをマニュアル形式のWord文書(docx)に変換するツールで�
 - 見出し、箇条書き、テーブル、コードブロック、画像に対応
 - インラインマークアップ(太字、斜体、取り消し線、インラインコード)
 
-## インストール
-
-```bash
-bun install
-```
-
 ## 使い方
 
-### 基本
+### クイックスタート（推奨）
+
+インストール不要。`npx`または`bunx`で直接実行できます:
 
 ```bash
-bun md2docx.js input.md output.docx
+npx md2mdocx input.md output.docx
+# または
+bunx md2mdocx input.md output.docx
+```
+
+### グローバルインストール
+
+```bash
+npm install -g md2mdocx
+# その後
+md2mdocx input.md output.docx
 ```
 
 ### オプション
@@ -58,7 +64,7 @@ bun md2docx.js input.md output.docx
 ### 使用例
 
 ```bash
-bun md2docx.js manual.md manual.docx \
+npx md2mdocx manual.md manual.docx \
   --title "MyApp" \
   --doctype "ユーザーマニュアル" \
   --version "2.0.0" \
