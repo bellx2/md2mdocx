@@ -27,11 +27,10 @@
 | データベース | データ永続化 | PostgreSQL |
 <br>
 ```mermaid
-graph LR;
-  A[ユーザー] -->|HTTPリクエスト| B[Webサーバ
-ー];
-  B -->|API呼び出し| C[APIサーバー];
-  C -->|SQLクエリ| D[データベース];
+flowchart LR
+a[ユーザー] --> b[Webサーバー]
+b --> c[APIサーバー]
+c --> d[データベース]
 ```
 
 ## 2.2. 動作環境
