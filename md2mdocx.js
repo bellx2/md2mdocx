@@ -29,6 +29,98 @@ const CONTENT_WIDTH = PAGE_WIDTH - (MARGIN * 2);
 const headerBorder = { style: BorderStyle.SINGLE, size: 24, color: "2F4F76" };
 const tableBorder = { style: BorderStyle.SINGLE, size: 1, color: "000000" };
 
+// ===== Mermaid設定 =====
+const MERMAID_IMAGE_WIDTH = 600;
+
+/**
+ * PNGバイナリから画像サイズを取得
+ * @param {Buffer} pngData - PNGバイナリデータ
+ * @returns {{width: number, height: number}|null} - 画像サイズ、取得失敗時はnull
+ */
+function getPngDimensions(pngData) {
+  // PNGシグネチャ確認
+  if (pngData.length < 24) return null;
+  if (pngData[0] !== 0x89 || pngData[1] !== 0x50 || pngData[2] !== 0x4E || pngData[3] !== 0x47) {
+    return null;
+  }
+  // IHDRチャンクから幅と高さを取得（ビッグエンディアン）
+  const width = pngData.readUInt32BE(16);
+  const height = pngData.readUInt32BE(20);
+  return { width, height };
+}
+
+/**
+ * Kroki APIを使用してMermaid図をPNG画像に変換
+ * @param {string} diagramSource - Mermaidダイアグラムのソースコード
+ * @returns {Promise<Buffer|null>} - PNG画像のバイナリデータ、失敗時はnull
+ */
+async function renderMermaidToPng(diagramSource) {
+  const https = require('https');
+
+  return new Promise((resolve) => {
+    const postData = diagramSource;
+    const options = {
+      hostname: 'kroki.io',
+      port: 443,
+      path: '/mermaid/png',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: 30000
+    };
+
+    const req = https.request(options, (res) => {
+      if (res.statusCode !== 200) {
+        console.warn(`警告: Kroki APIエラー (HTTP ${res.statusCode})`);
+        resolve(null);
+        return;
+      }
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+
+    req.on('error', (e) => {
+      console.warn(`警告: Kroki API接続エラー: ${e.message}`);
+      resolve(null);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      console.warn('警告: Kroki APIタイムアウト');
+      resolve(null);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * すべてのMermaid図を事前レンダリング
+ * @param {Array} elements - パース済み要素の配列
+ * @returns {Promise<Map<string, Buffer>>} - ダイアグラムソースをキーとするPNGデータのMap
+ */
+async function prerenderMermaidDiagrams(elements) {
+  const mermaidElements = elements.filter(
+    el => el.type === 'code' && el.language === 'mermaid'
+  );
+
+  const renderedMap = new Map();
+
+  for (const el of mermaidElements) {
+    if (!renderedMap.has(el.content)) {
+      console.log('Mermaid図をレンダリング中...');
+      const imageData = await renderMermaidToPng(el.content);
+      renderedMap.set(el.content, imageData);
+    }
+  }
+
+  return renderedMap;
+}
+
 // ===== コマンドライン引数パース =====
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -605,7 +697,7 @@ function createTOCSection(options) {
 }
 
 // ===== 本文要素をWord要素に変換 =====
-function convertElements(elements, options, inputDir) {
+function convertElements(elements, options, inputDir, mermaidRenderedMap = new Map()) {
   const children = [];
   let numberListRef = 0;
   let currentSectionIndent = 0; // 現在のセクションのインデント
@@ -667,7 +759,63 @@ function convertElements(elements, options, inputDir) {
         break;
 
       case 'code':
-        // コードブロックは背景色付きで表示
+        // Mermaidコードブロックの処理
+        if (el.language === 'mermaid') {
+          const mermaidKey = el.content;
+          const imageData = mermaidRenderedMap.get(mermaidKey);
+
+          if (imageData) {
+            // PNG画像のサイズを取得
+            const dimensions = getPngDimensions(imageData);
+            let imgWidth = dimensions ? dimensions.width : MERMAID_IMAGE_WIDTH;
+            let imgHeight = dimensions ? dimensions.height : Math.round(MERMAID_IMAGE_WIDTH * 0.6);
+
+            // ページ幅・高さに収まるよう縮小（TWIP→ピクセル: 1インチ=1440TWIP, 96dpi）
+            const maxWidth = (CONTENT_WIDTH - currentSectionIndent) / 1440 * 96;
+            const maxHeight = 600; // 最大高さ（ピクセル）
+            if (imgWidth > maxWidth || imgHeight > maxHeight) {
+              const scaleW = maxWidth / imgWidth;
+              const scaleH = maxHeight / imgHeight;
+              const scale = Math.min(scaleW, scaleH);
+              imgWidth = Math.round(imgWidth * scale);
+              imgHeight = Math.round(imgHeight * scale);
+            }
+
+            // PNG画像として埋め込み
+            children.push(new Paragraph({
+              indent: { left: currentSectionIndent },
+              alignment: AlignmentType.CENTER,
+              children: [new ImageRun({
+                type: 'png',
+                data: imageData,
+                transformation: { width: imgWidth, height: imgHeight },
+                altText: {
+                  title: 'Mermaid Diagram',
+                  description: 'Mermaid diagram',
+                  name: 'mermaid-diagram'
+                }
+              })]
+            }));
+          } else {
+            // フォールバック: 警告メッセージを表示
+            children.push(new Paragraph({
+              indent: { left: currentSectionIndent },
+              shading: { fill: "FFF3CD", type: ShadingType.CLEAR },
+              border: { left: { style: BorderStyle.SINGLE, size: 12, color: "FFC107" } },
+              children: [
+                new TextRun({
+                  text: '[Mermaid図: レンダリング失敗 - API接続エラーまたはオフライン]',
+                  font: "Meiryo",
+                  size: 20,
+                  color: "856404"
+                })
+              ]
+            }));
+          }
+          break;
+        }
+
+        // 通常のコードブロックは背景色付きで表示
         const codeLines = el.content.split('\n');
         for (const codeLine of codeLines) {
           children.push(new Paragraph({
@@ -777,7 +925,10 @@ async function main() {
   // パース
   const parser = new MarkdownParser(markdown);
   const elements = parser.parse();
-  
+
+  // Mermaid図の事前レンダリング
+  const mermaidRenderedMap = await prerenderMermaidDiagrams(elements);
+
   // 番号付きリストの設定を動的に生成（#はインデントなし、##以降は360）
   const numberConfigs = [];
   let listCount = 0;
@@ -798,7 +949,7 @@ async function main() {
   }
 
   // Word要素に変換
-  const contentChildren = convertElements(elements, options, inputDir);
+  const contentChildren = convertElements(elements, options, inputDir, mermaidRenderedMap);
 
   // ドキュメント生成
   const doc = new Document({

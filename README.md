@@ -77,6 +77,23 @@ You can also specify size using HTML img tags:
 <img src="icon.png" width="24" height="24">
 ```
 
+### Mermaid Diagrams
+
+Mermaid code blocks are automatically converted to PNG images using [Kroki](https://kroki.io) API:
+
+~~~markdown
+```mermaid
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Process A]
+    B -->|No| D[Process B]
+```
+~~~
+
+- Requires internet connection for rendering
+- Images are displayed at original size, scaled down if exceeding page width
+- If rendering fails, a warning message is shown in the document
+
 ## Notes
 
 ### Opening Generated Documents
