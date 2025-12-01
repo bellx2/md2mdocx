@@ -4,9 +4,37 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1] - 2025-12-01
+
+### Added
+
+- カラーテーマ機能を追加（`--theme` オプション: blue, orange, green）
+  - ヘッダー下線の色
+  - 変更履歴テーブルのヘッダー背景色
+  - Mermaid図の配色（default, neutral, forest）
+
+## [1.1.0] - 2025-12-01
+
+### Added
+
+- 強制改行（`<br>`）のサポートを追加
+- 強制改ページ（`<pagebreak>`）のサポートを追加
+- Mermaid図のサポートを追加（Kroki APIを使用）
+- サンプルPDFとロゴ画像を追加
+- 出力サンプルへのリンクをREADMEに追加
+
+### Fixed
+
+- Mermaid図の構文を修正し、フローチャートの表示を改善
+- Makefileの部署名と文書番号を修正
+
+## [1.0.4] - 2025-11-28
+
 ### Fixed
 
 - 目次(TOC)に見出し項目が表示されない問題を修正
+- 見出しのスタイルとインデント処理を改善
+- フィールド更新ダイアログの説明を追加
 
 ## [1.0.3] - 2025-11-28
 
