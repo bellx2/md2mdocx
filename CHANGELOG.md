@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.2] - 2025-12-02
+
+### Added
+
+- YAML設定ファイルからの引数読み込み機能を追加
+  - mdファイルと同じパスにある.yamlファイルを自動で探索
+  - `--config`オプションで明示的に設定ファイルを指定可能
+  - 優先順位: コマンドライン引数 > 設定ファイル > デフォルト値
+- HTMLコメント形式の制御機能を追加
+  - `<!-- md2mdocx:start -->` 以降からパース開始
+  - `<!-- md2mdocx:end -->` でパース終了
+  - `<!-- md2mdocx:pagebreak -->` で改ページ
+  - `<!-- md2mdocx:br -->` で改行（空行挿入）
+
 ## [1.1.1] - 2025-12-01
 
 ### Added

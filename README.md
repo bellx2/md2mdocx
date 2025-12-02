@@ -45,6 +45,26 @@ md2mdocx input.md output.docx
 | `--logo` | Logo image path | None |
 | `--company` | Company name | サンプル株式会社 |
 | `--theme` | Color theme | blue |
+| `--config` | Config file path | (auto-detect) |
+
+#### Config File (YAML)
+
+Options can also be specified in a YAML file. By default, `input.yaml` (same path as the input `.md` file) is automatically loaded.
+
+```yaml
+title: "MyApp"
+subtitle: "Manual"
+doctype: "User Manual"
+version: "2.0.0"
+date: "January 1, 2025"
+dept: "Development"
+docnum: "DOC-001"
+company: "ABC Corp"
+theme: "blue"
+# logo: "logo.png"
+```
+
+**Priority:** Command-line arguments > Config file > Defaults
 
 #### Theme Options
 
@@ -112,6 +132,41 @@ This content appears on a new page.
 |--------|--------|
 | `<br>` | Force line break within paragraph |
 | `<pagebreak>` | Force page break |
+
+### HTML Comment Controls
+
+For use with existing Markdown files (e.g., README), you can use HTML comments to control parsing:
+
+```markdown
+# Project Title (skipped)
+
+Badges and links here...
+
+<!-- md2mdocx:start -->
+
+# Documentation starts here
+
+Content to be converted...
+
+<!-- md2mdocx:pagebreak -->
+
+# New page
+
+<!-- md2mdocx:br -->
+
+Empty line inserted above.
+
+<!-- md2mdocx:end -->
+
+## Appendix (skipped)
+```
+
+| Comment | Effect |
+|---------|--------|
+| `<!-- md2mdocx:start -->` | Start parsing from this line (skip content before) |
+| `<!-- md2mdocx:end -->` | End parsing at this line (skip content after) |
+| `<!-- md2mdocx:pagebreak -->` | Force page break |
+| `<!-- md2mdocx:br -->` | Insert empty line |
 
 ### Mermaid Diagrams
 
