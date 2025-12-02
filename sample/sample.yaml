@@ -1,0 +1,11 @@
+# md2mdocx 設定ファイル例
+title: "サンプル製品"
+subtitle: "ユーザーガイド"
+doctype: "操作マニュアル"
+version: "2.0.0"
+date: "2024年12月1日"
+dept: "開発部"
+docnum: "SAMPLE-001"
+company: "サンプル株式会社"
+theme: "blue"
+# logo: "logo.png"

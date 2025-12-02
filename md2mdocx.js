@@ -15,6 +15,21 @@
  *   --logo "logo.png"
  *   --company "会社名"
  *   --theme "blue|orange|green"  (差し色テーマ)
+ *   --config "config.yaml"       (設定ファイルパス、省略時はinput.yamlを探索)
+ *
+ * 設定ファイル (YAML):
+ *   title: "製品名"
+ *   subtitle: "マニュアル"
+ *   doctype: "操作マニュアル"
+ *   version: "1.0.0"
+ *   date: "2024年1月1日"
+ *   dept: "技術開発部"
+ *   docnum: "DOC-001"
+ *   logo: "logo.png"
+ *   company: "会社名"
+ *   theme: "blue"
+ *
+ * 優先順位: コマンドライン引数 > 設定ファイル > デフォルト値
  */
 
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Header, Footer,
@@ -22,6 +37,7 @@ const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Header
         TableOfContents, ShadingType, LevelFormat, ImageRun } = require('docx');
 const fs = require('fs');
 const path = require('path');
+const YAML = require('yaml');
 
 // ===== 設定 =====
 const PAGE_WIDTH = 11906;
@@ -156,12 +172,32 @@ async function prerenderMermaidDiagrams(elements, mermaidTheme = 'default') {
   return renderedMap;
 }
 
+// ===== 設定ファイル読み込み =====
+/**
+ * YAML設定ファイルを読み込む
+ * @param {string} configPath - 設定ファイルのパス
+ * @returns {object} - 設定オブジェクト（ファイルがなければ空オブジェクト）
+ */
+function loadConfigFile(configPath) {
+  if (!configPath || !fs.existsSync(configPath)) {
+    return {};
+  }
+  try {
+    const content = fs.readFileSync(configPath, 'utf-8');
+    const config = YAML.parse(content);
+    return config || {};
+  } catch (e) {
+    console.warn(`警告: 設定ファイルの読み込みに失敗しました: ${e.message}`);
+    return {};
+  }
+}
+
 // ===== コマンドライン引数パース =====
 function parseArgs() {
   const args = process.argv.slice(2);
-  const options = {
-    input: null,
-    output: null,
+
+  // デフォルト値
+  const defaults = {
     title: "製品名",
     subtitle: "マニュアル",
     doctype: "操作マニュアル",
@@ -174,24 +210,73 @@ function parseArgs() {
     theme: "blue"
   };
 
+  // コマンドライン引数をパース
+  const cliOptions = {
+    input: null,
+    output: null,
+    config: null
+  };
+  const cliValues = {};
+
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith('--')) {
       const key = args[i].slice(2);
-      if (options.hasOwnProperty(key) && i + 1 < args.length) {
-        options[key] = args[++i];
+      if (i + 1 < args.length) {
+        if (key === 'input' || key === 'output' || key === 'config') {
+          cliOptions[key] = args[++i];
+        } else if (defaults.hasOwnProperty(key)) {
+          cliValues[key] = args[++i];
+        }
       }
-    } else if (!options.input) {
-      options.input = args[i];
-    } else if (!options.output) {
-      options.output = args[i];
+    } else if (!cliOptions.input) {
+      cliOptions.input = args[i];
+    } else if (!cliOptions.output) {
+      cliOptions.output = args[i];
     }
   }
 
-  if (!options.input) {
+  if (!cliOptions.input) {
     console.error('Usage: node md2docx.js input.md output.docx [options]');
-    console.error('Options: --title, --subtitle, --doctype, --version, --date, --dept, --docnum, --logo, --company, --theme');
+    console.error('Options: --title, --subtitle, --doctype, --version, --date, --dept, --docnum, --logo, --company, --theme, --config');
     console.error('Theme: blue (default), orange, green');
+    console.error('');
+    console.error('設定ファイル: input.mdと同じパスにあるinput.yamlを自動で読み込みます');
+    console.error('              --config オプションで明示的に指定も可能です');
     process.exit(1);
+  }
+
+  // 設定ファイルのパスを決定
+  let configPath = cliOptions.config;
+  if (!configPath) {
+    // mdファイルと同じパスにある.yamlファイルを探す
+    const inputPath = path.resolve(cliOptions.input);
+    const yamlPath = inputPath.replace(/\.md$/, '.yaml');
+    if (fs.existsSync(yamlPath)) {
+      configPath = yamlPath;
+      console.log(`設定ファイルを読み込み: ${yamlPath}`);
+    }
+  }
+
+  // 設定ファイルを読み込む
+  const fileConfig = loadConfigFile(configPath);
+
+  // 優先順位: コマンドライン引数 > 設定ファイル > デフォルト値
+  const options = {
+    input: cliOptions.input,
+    output: cliOptions.output,
+    ...defaults
+  };
+
+  // 設定ファイルの値を適用
+  for (const key of Object.keys(defaults)) {
+    if (fileConfig[key] !== undefined) {
+      options[key] = fileConfig[key];
+    }
+  }
+
+  // コマンドライン引数の値を適用（最優先）
+  for (const key of Object.keys(cliValues)) {
+    options[key] = cliValues[key];
   }
 
   // テーマの検証
