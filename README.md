@@ -46,6 +46,7 @@ md2mdocx input.md output.docx
 | `--company` | Company name | サンプル株式会社 |
 | `--theme` | Color theme | blue |
 | `--config` | Config file path | (auto-detect) |
+| `--hr-pagebreak` | Treat `---` as page break | true |
 
 #### Config File (YAML)
 
@@ -61,6 +62,7 @@ dept: "Development"
 docnum: "DOC-001"
 company: "ABC Corp"
 theme: "blue"
+hr-pagebreak: true
 # logo: "logo.png"
 ```
 
@@ -132,6 +134,7 @@ This content appears on a new page.
 |--------|--------|
 | `<br>` | Force line break within paragraph |
 | `<pagebreak>` | Force page break |
+| `---` | Page break (when `--hr-pagebreak true`, default) or horizontal rule |
 
 ### HTML Comment Controls
 

@@ -48,6 +48,7 @@ md2mdocx input.md output.docx
 | `--company` | 会社名 | サンプル株式会社 |
 | `--theme` | カラーテーマ | blue |
 | `--config` | 設定ファイルパス | (自動検出) |
+| `--hr-pagebreak` | `---`を改ページとして扱う | true |
 
 #### 設定ファイル (YAML)
 
@@ -63,6 +64,7 @@ dept: "開発部"
 docnum: "DOC-001"
 company: "株式会社ABC"
 theme: "blue"
+hr-pagebreak: true
 # logo: "logo.png"
 ```
 
@@ -153,6 +155,7 @@ HTMLのimgタグでサイズ指定も可能。
 |------|------|
 | `<br>` | 段落内で強制改行 |
 | `<pagebreak>` | 強制改ページ |
+| `---` | 改ページ（`--hr-pagebreak true`時、デフォルト）または水平線 |
 
 ### HTMLコメント制御
 

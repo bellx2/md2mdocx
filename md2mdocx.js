@@ -36,6 +36,9 @@
  *   <!-- md2mdocx:end -->    この行でパース終了（ファイル末尾を読み飛ばす）
  *   <!-- md2mdocx:pagebreak --> 改ページ
  *   <!-- md2mdocx:br -->     改行
+ *
+ * その他のオプション:
+ *   --hr-pagebreak true/false  水平線(---)を改ページとして扱う（デフォルト: true）
  */
 
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Header, Footer,
@@ -213,7 +216,8 @@ function parseArgs() {
     docnum: "DOC-001",
     logo: null,
     company: "サンプル株式会社",
-    theme: "blue"
+    theme: "blue",
+    "hr-pagebreak": true
   };
 
   // コマンドライン引数をパース
@@ -231,7 +235,15 @@ function parseArgs() {
         if (key === 'input' || key === 'output' || key === 'config') {
           cliOptions[key] = args[++i];
         } else if (defaults.hasOwnProperty(key)) {
-          cliValues[key] = args[++i];
+          const value = args[++i];
+          // boolean値の変換
+          if (value === 'true') {
+            cliValues[key] = true;
+          } else if (value === 'false') {
+            cliValues[key] = false;
+          } else {
+            cliValues[key] = value;
+          }
         }
       }
     } else if (!cliOptions.input) {
@@ -1072,11 +1084,19 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
         break;
 
       case 'hr':
-        children.push(new Paragraph({
-          indent: { left: currentSectionIndent },
-          border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" } },
-          children: []
-        }));
+        if (options["hr-pagebreak"]) {
+          // 水平線を改ページとして扱う
+          children.push(new Paragraph({
+            children: [new PageBreak()]
+          }));
+        } else {
+          // 通常の水平線
+          children.push(new Paragraph({
+            indent: { left: currentSectionIndent },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" } },
+            children: []
+          }));
+        }
         break;
 
       case 'pagebreak':

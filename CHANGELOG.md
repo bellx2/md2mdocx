@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.3] - 2025-12-02
+
+### Added
+
+- 水平線(---)を改ページとして扱うオプションを追加
+  - `--hr-pagebreak` オプション（デフォルト: true）
+  - YAMLでも `hr-pagebreak: true/false` で指定可能
+
 ## [1.1.2] - 2025-12-02
 
 ### Added
