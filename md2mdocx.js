@@ -30,6 +30,12 @@
  *   theme: "blue"
  *
  * 優先順位: コマンドライン引数 > 設定ファイル > デフォルト値
+ *
+ * HTMLコメント制御:
+ *   <!-- md2mdocx:start -->  この行以降からパース開始（ファイル先頭を読み飛ばす）
+ *   <!-- md2mdocx:end -->    この行でパース終了（ファイル末尾を読み飛ばす）
+ *   <!-- md2mdocx:pagebreak --> 改ページ
+ *   <!-- md2mdocx:br -->     改行
  */
 
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Header, Footer,
@@ -316,9 +322,23 @@ class MarkdownParser {
         continue;
       }
 
-      // 強制改ページ
+      // 強制改ページ（タグ形式）
       if (line.match(/^<pagebreak\s*\/?>$/i)) {
         this.elements.push({ type: 'pagebreak' });
+        this.pos++;
+        continue;
+      }
+
+      // 強制改ページ（HTMLコメント形式）
+      if (line.match(/^<!--\s*md2mdocx:pagebreak\s*-->$/i)) {
+        this.elements.push({ type: 'pagebreak' });
+        this.pos++;
+        continue;
+      }
+
+      // 強制改行（HTMLコメント形式）
+      if (line.match(/^<!--\s*md2mdocx:br\s*-->$/i)) {
+        this.elements.push({ type: 'br' });
         this.pos++;
         continue;
       }
@@ -1064,6 +1084,13 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
           children: [new PageBreak()]
         }));
         break;
+
+      case 'br':
+        children.push(new Paragraph({
+          indent: { left: currentSectionIndent },
+          children: []
+        }));
+        break;
     }
   }
 
@@ -1082,7 +1109,20 @@ async function main() {
   const changelog = extractChangelog(markdownRaw);
 
   // CHANGELOGブロックを本文から除外
-  const markdown = markdownRaw.replace(/<!--\s*CHANGELOG\s*-->[\s\S]*?<!--\s*\/CHANGELOG\s*-->\s*/, '');
+  let markdown = markdownRaw.replace(/<!--\s*CHANGELOG\s*-->[\s\S]*?<!--\s*\/CHANGELOG\s*-->\s*/, '');
+
+  // md2mdocx:start/end による範囲指定
+  const startMatch = markdown.match(/<!--\s*md2mdocx:start\s*-->/i);
+  const endMatch = markdown.match(/<!--\s*md2mdocx:end\s*-->/i);
+  if (startMatch) {
+    markdown = markdown.slice(startMatch.index + startMatch[0].length);
+  }
+  if (endMatch) {
+    const endIdx = markdown.search(/<!--\s*md2mdocx:end\s*-->/i);
+    if (endIdx !== -1) {
+      markdown = markdown.slice(0, endIdx);
+    }
+  }
 
   // パース
   const parser = new MarkdownParser(markdown);
