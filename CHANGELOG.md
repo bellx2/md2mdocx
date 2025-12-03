@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.5] - 2025-12-03
+
+### Changed
+
+- 出力メッセージを日本語から英語に変更
+- デフォルト値を英語に変更（製品名、会社名、部署名等）
+- 日付フォーマットを日本語（ja-JP）から英語（en-US）に変更
+- ドキュメント内ラベルを英語化（変更履歴→Change History、目次→Table of Contents等）
+- コード内コメントを英語化
+
 ## [1.1.4] - 2025-12-03
 
 ### Added
