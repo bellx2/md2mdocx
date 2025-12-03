@@ -1,45 +1,45 @@
 #!/usr/bin/env node
 /**
  * Markdown to Word Converter
- * マニュアルテンプレート形式
+ * Manual Template Format
  *
  * Usage: bun md2docx.js input.md output.docx [options]
  * Options:
- *   --title "製品名"
- *   --subtitle "マニュアル"
- *   --doctype "操作マニュアル"
+ *   --title "Product Name"
+ *   --subtitle "Manual"
+ *   --doctype "Operation Manual"
  *   --version "1.0.0"
- *   --date "2024年1月1日"
- *   --dept "技術開発部"
+ *   --date "January 1, 2024"
+ *   --dept "Technical Development"
  *   --docnum "DOC-001"
  *   --logo "logo.png"
- *   --company "会社名"
- *   --theme "blue|orange|green"  (差し色テーマ)
- *   --config "config.yaml"       (設定ファイルパス、省略時はinput.yamlを探索)
+ *   --company "Company Name"
+ *   --theme "blue|orange|green"  (accent color theme)
+ *   --config "config.yaml"       (config file path, defaults to input.yaml)
  *
- * 設定ファイル (YAML):
- *   title: "製品名"
- *   subtitle: "マニュアル"
- *   doctype: "操作マニュアル"
+ * Config file (YAML):
+ *   title: "Product Name"
+ *   subtitle: "Manual"
+ *   doctype: "Operation Manual"
  *   version: "1.0.0"
- *   date: "2024年1月1日"
- *   dept: "技術開発部"
+ *   date: "January 1, 2024"
+ *   dept: "Technical Development"
  *   docnum: "DOC-001"
  *   logo: "logo.png"
- *   company: "会社名"
+ *   company: "Company Name"
  *   theme: "blue"
  *
- * 優先順位: コマンドライン引数 > 設定ファイル > デフォルト値
+ * Priority: Command line args > Config file > Default values
  *
- * HTMLコメント制御:
- *   <!-- md2mdocx:start -->  この行以降からパース開始（ファイル先頭を読み飛ばす）
- *   <!-- md2mdocx:end -->    この行でパース終了（ファイル末尾を読み飛ばす）
- *   <!-- md2mdocx:pagebreak --> 改ページ
- *   <!-- md2mdocx:br -->     改行
+ * HTML comment controls:
+ *   <!-- md2mdocx:start -->  Start parsing from this line (skip file header)
+ *   <!-- md2mdocx:end -->    End parsing at this line (skip file footer)
+ *   <!-- md2mdocx:pagebreak --> Page break
+ *   <!-- md2mdocx:br -->     Line break
  *
- * その他のオプション:
- *   --hr-pagebreak true/false  水平線(---)を改ページとして扱う（デフォルト: true）
- *   --save-config "config.yaml" 現在の設定（デフォルト含む）をYAMLファイルとして保存
+ * Other options:
+ *   --hr-pagebreak true/false  Treat horizontal rules (---) as page breaks (default: true)
+ *   --save-config "config.yaml" Save current settings (including defaults) to YAML file
  */
 
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Header, Footer,
@@ -87,9 +87,9 @@ function getThemeColors(theme) {
 const MERMAID_IMAGE_WIDTH = 600;
 
 /**
- * PNGバイナリから画像サイズを取得
- * @param {Buffer} pngData - PNGバイナリデータ
- * @returns {{width: number, height: number}|null} - 画像サイズ、取得失敗時はnull
+ * Get image dimensions from PNG binary
+ * @param {Buffer} pngData - PNG binary data
+ * @returns {{width: number, height: number}|null} - Image dimensions, null on failure
  */
 function getPngDimensions(pngData) {
   // PNGシグネチャ確認
@@ -104,10 +104,10 @@ function getPngDimensions(pngData) {
 }
 
 /**
- * Kroki APIを使用してMermaid図をPNG画像に変換
- * @param {string} diagramSource - Mermaidダイアグラムのソースコード
- * @param {string} mermaidTheme - Mermaidテーマ名 (default, neutral, dark, forest, base)
- * @returns {Promise<Buffer|null>} - PNG画像のバイナリデータ、失敗時はnull
+ * Convert Mermaid diagram to PNG image using Kroki API
+ * @param {string} diagramSource - Mermaid diagram source code
+ * @param {string} mermaidTheme - Mermaid theme name (default, neutral, dark, forest, base)
+ * @returns {Promise<Buffer|null>} - PNG image binary data, null on failure
  */
 async function renderMermaidToPng(diagramSource, mermaidTheme = 'default') {
   const https = require('https');
@@ -133,7 +133,7 @@ async function renderMermaidToPng(diagramSource, mermaidTheme = 'default') {
 
     const req = https.request(options, (res) => {
       if (res.statusCode !== 200) {
-        console.warn(`警告: Kroki APIエラー (HTTP ${res.statusCode})`);
+        console.warn(`Warning: Kroki API error (HTTP ${res.statusCode})`);
         resolve(null);
         return;
       }
@@ -143,13 +143,13 @@ async function renderMermaidToPng(diagramSource, mermaidTheme = 'default') {
     });
 
     req.on('error', (e) => {
-      console.warn(`警告: Kroki API接続エラー: ${e.message}`);
+      console.warn(`Warning: Kroki API connection error: ${e.message}`);
       resolve(null);
     });
 
     req.on('timeout', () => {
       req.destroy();
-      console.warn('警告: Kroki APIタイムアウト');
+      console.warn('Warning: Kroki API timeout');
       resolve(null);
     });
 
@@ -159,10 +159,10 @@ async function renderMermaidToPng(diagramSource, mermaidTheme = 'default') {
 }
 
 /**
- * すべてのMermaid図を事前レンダリング
- * @param {Array} elements - パース済み要素の配列
- * @param {string} mermaidTheme - Mermaidテーマ名
- * @returns {Promise<Map<string, Buffer>>} - ダイアグラムソースをキーとするPNGデータのMap
+ * Pre-render all Mermaid diagrams
+ * @param {Array} elements - Array of parsed elements
+ * @param {string} mermaidTheme - Mermaid theme name
+ * @returns {Promise<Map<string, Buffer>>} - Map of diagram source to PNG data
  */
 async function prerenderMermaidDiagrams(elements, mermaidTheme = 'default') {
   const mermaidElements = elements.filter(
@@ -173,7 +173,7 @@ async function prerenderMermaidDiagrams(elements, mermaidTheme = 'default') {
 
   for (const el of mermaidElements) {
     if (!renderedMap.has(el.content)) {
-      console.log('Mermaid図をレンダリング中...');
+      console.log('Rendering Mermaid diagram...');
       const imageData = await renderMermaidToPng(el.content, mermaidTheme);
       renderedMap.set(el.content, imageData);
     }
@@ -182,11 +182,11 @@ async function prerenderMermaidDiagrams(elements, mermaidTheme = 'default') {
   return renderedMap;
 }
 
-// ===== 設定ファイル読み込み =====
+// ===== Config file loading =====
 /**
- * YAML設定ファイルを読み込む
- * @param {string} configPath - 設定ファイルのパス
- * @returns {object} - 設定オブジェクト（ファイルがなければ空オブジェクト）
+ * Load YAML config file
+ * @param {string} configPath - Config file path
+ * @returns {object} - Config object (empty object if file not found)
  */
 function loadConfigFile(configPath) {
   if (!configPath || !fs.existsSync(configPath)) {
@@ -197,24 +197,24 @@ function loadConfigFile(configPath) {
     const config = YAML.parse(content);
     return config || {};
   } catch (e) {
-    console.warn(`警告: 設定ファイルの読み込みに失敗しました: ${e.message}`);
+    console.warn(`Warning: Failed to load config file: ${e.message}`);
     return {};
   }
 }
 
 /**
- * 設定をYAMLファイルに保存
- * @param {string} savePath - 保存先ファイルパス
- * @param {object} options - 保存する設定オブジェクト
- * @param {object} defaults - デフォルト値オブジェクト
+ * Save config to YAML file
+ * @param {string} savePath - Destination file path
+ * @param {object} options - Config object to save
+ * @param {object} defaults - Default values object
  */
 function saveConfigFile(savePath, options, defaults) {
-  // 拡張子を.yamlに強制
+  // Force .yaml extension
   if (!savePath.endsWith('.yaml') && !savePath.endsWith('.yml')) {
     savePath = savePath + '.yaml';
   }
 
-  // 保存する設定項目（input, output, config, save-configは除外、nullは除外）
+  // Config items to save (exclude input, output, config, save-config, and null values)
   const configToSave = {};
   for (const key of Object.keys(defaults)) {
     if (options[key] !== null) {
@@ -225,33 +225,33 @@ function saveConfigFile(savePath, options, defaults) {
   try {
     const yamlContent = YAML.stringify(configToSave, { lineWidth: 0 });
     fs.writeFileSync(savePath, yamlContent);
-    console.log(`設定を保存しました: ${savePath}`);
+    console.log(`Config saved: ${savePath}`);
   } catch (e) {
-    console.error(`エラー: 設定ファイルの保存に失敗しました: ${e.message}`);
+    console.error(`Error: Failed to save config file: ${e.message}`);
     process.exit(1);
   }
 }
 
-// ===== コマンドライン引数パース =====
+// ===== Command line argument parsing =====
 function parseArgs() {
   const args = process.argv.slice(2);
 
-  // デフォルト値
+  // Default values
   const defaults = {
-    title: "製品名",
-    subtitle: "マニュアル",
-    doctype: "操作マニュアル",
+    title: "Product Name",
+    subtitle: "Manual",
+    doctype: "Operation Manual",
     version: "1.0.0",
-    date: new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }),
-    dept: "技術開発部",
+    date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+    dept: "Technical Development",
     docnum: "DOC-001",
     logo: null,
-    company: "サンプル株式会社",
+    company: "Sample Corporation",
     theme: "blue",
     "hr-pagebreak": true
   };
 
-  // コマンドライン引数をパース
+  // Parse command line arguments
   const cliOptions = {
     input: null,
     output: null,
@@ -263,7 +263,7 @@ function parseArgs() {
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith('--')) {
       let key, value;
-      // --key=value 形式をサポート
+      // Support --key=value format
       if (args[i].includes('=')) {
         const eqIndex = args[i].indexOf('=');
         key = args[i].slice(2, eqIndex);
@@ -276,7 +276,7 @@ function parseArgs() {
       if (key === 'input' || key === 'output' || key === 'config' || key === 'save-config') {
         cliOptions[key] = value;
       } else if (defaults.hasOwnProperty(key) && value !== undefined) {
-        // boolean値の変換
+        // Convert boolean values
         if (value === 'true') {
           cliValues[key] = true;
         } else if (value === 'false') {
@@ -292,56 +292,56 @@ function parseArgs() {
     }
   }
 
-  // --save-configのみの場合は入力ファイル不要
+  // Input file not required when only using --save-config
   if (!cliOptions.input && !cliOptions["save-config"]) {
     console.error('Usage: node md2docx.js input.md output.docx [options]');
     console.error('Options: --title, --subtitle, --doctype, --version, --date, --dept, --docnum, --logo, --company, --theme, --config');
     console.error('Theme: blue (default), orange, green');
     console.error('');
-    console.error('設定ファイル: input.mdと同じパスにあるinput.yamlを自動で読み込みます');
-    console.error('              --config オプションで明示的に指定も可能です');
+    console.error('Config file: Automatically loads input.yaml from the same path as input.md');
+    console.error('             Can also be explicitly specified with --config option');
     console.error('');
-    console.error('設定を保存: --save-config config.yaml で現在の設定をYAMLファイルとして保存');
+    console.error('Save config: Use --save-config config.yaml to save current settings to YAML file');
     process.exit(1);
   }
 
-  // 設定ファイルのパスを決定
+  // Determine config file path
   let configPath = cliOptions.config;
   if (!configPath && cliOptions.input) {
-    // mdファイルと同じパスにある.yamlファイルを探す
+    // Look for .yaml file in the same path as md file
     const inputPath = path.resolve(cliOptions.input);
     const yamlPath = inputPath.replace(/\.md$/, '.yaml');
     if (fs.existsSync(yamlPath)) {
       configPath = yamlPath;
-      console.log(`設定ファイルを読み込み: ${yamlPath}`);
+      console.log(`Loading config file: ${yamlPath}`);
     }
   }
 
-  // 設定ファイルを読み込む
+  // Load config file
   const fileConfig = loadConfigFile(configPath);
 
-  // 優先順位: コマンドライン引数 > 設定ファイル > デフォルト値
+  // Priority: Command line args > Config file > Default values
   const options = {
     input: cliOptions.input,
     output: cliOptions.output,
     ...defaults
   };
 
-  // 設定ファイルの値を適用
+  // Apply config file values
   for (const key of Object.keys(defaults)) {
     if (fileConfig[key] !== undefined) {
       options[key] = fileConfig[key];
     }
   }
 
-  // コマンドライン引数の値を適用（最優先）
+  // Apply command line argument values (highest priority)
   for (const key of Object.keys(cliValues)) {
     options[key] = cliValues[key];
   }
 
-  // テーマの検証
+  // Validate theme
   if (!THEME_COLORS[options.theme]) {
-    console.warn(`警告: 不明なテーマ "${options.theme}"。デフォルトの "blue" を使用します。`);
+    console.warn(`Warning: Unknown theme "${options.theme}". Using default "blue".`);
     options.theme = "blue";
   }
 
@@ -349,7 +349,7 @@ function parseArgs() {
     options.output = options.input.replace(/\.md$/, '.docx');
   }
 
-  // --save-configが指定された場合、設定を保存して終了
+  // If --save-config is specified, save settings and exit
   if (cliOptions["save-config"]) {
     saveConfigFile(cliOptions["save-config"], options, defaults);
     process.exit(0);
@@ -358,7 +358,7 @@ function parseArgs() {
   return options;
 }
 
-// ===== Markdownパーサー =====
+// ===== Markdown Parser =====
 class MarkdownParser {
   constructor(markdown) {
     this.lines = markdown.split('\n');
@@ -585,7 +585,7 @@ class MarkdownParser {
   }
 }
 
-// ===== インラインマークアップ処理 =====
+// ===== Inline markup processing =====
 function parseInlineMarkup(text, inputDir = null) {
   const runs = [];
   let remaining = text;
@@ -675,14 +675,14 @@ function parseInlineMarkup(text, inputDir = null) {
               transformation: { width: imgWidth, height: imgHeight }
             }));
           } else {
-            runs.push(new TextRun({ text: `[画像: ${earliest.src}]`, font: "Meiryo", size: 22, color: "FF0000" }));
+            runs.push(new TextRun({ text: `[Image: ${earliest.src}]`, font: "Meiryo", size: 22, color: "FF0000" }));
           }
         } catch (e) {
-          runs.push(new TextRun({ text: `[画像エラー]`, font: "Meiryo", size: 22, color: "FF0000" }));
+          runs.push(new TextRun({ text: `[Image error]`, font: "Meiryo", size: 22, color: "FF0000" }));
         }
       } else if (earliest.type === 'image') {
-        // inputDirがない場合はテキストで表示
-        runs.push(new TextRun({ text: `[画像]`, font: "Meiryo", size: 22 }));
+        // Display as text when inputDir is not available
+        runs.push(new TextRun({ text: `[Image]`, font: "Meiryo", size: 22 }));
       } else {
         runs.push(new TextRun({ text: earliest.text, font: "Meiryo", size: 22, ...earliest.style }));
       }
@@ -698,7 +698,7 @@ function parseInlineMarkup(text, inputDir = null) {
   return runs.length > 0 ? runs : [new TextRun({ text: text, font: "Meiryo", size: 22 })];
 }
 
-// ===== ヘッダー生成 =====
+// ===== Header generation =====
 function createHeader(options) {
   const colors = getThemeColors(options.theme);
   const headerBorder = { style: BorderStyle.SINGLE, size: 24, color: colors.headerBorder };
@@ -737,7 +737,7 @@ function createHeader(options) {
   });
 }
 
-// ===== フッター生成 =====
+// ===== Footer generation =====
 function createFooter() {
   return new Footer({
     children: [new Paragraph({
@@ -751,7 +751,7 @@ function createFooter() {
   });
 }
 
-// ===== 表紙セクション =====
+// ===== Cover section =====
 function createCoverSection(options, inputDir) {
   const children = [
     new Paragraph({ spacing: { before: 2400 }, children: [] }),
@@ -784,7 +784,7 @@ function createCoverSection(options, inputDir) {
     })
   ];
 
-  // ロゴ画像を追加
+  // Add logo image
   if (options.logo) {
     try {
       const logoPath = path.isAbsolute(options.logo) ? options.logo : path.join(inputDir, options.logo);
@@ -802,10 +802,10 @@ function createCoverSection(options, inputDir) {
           })]
         }));
       } else {
-        console.warn(`警告: ロゴ画像が見つかりません: ${logoPath}`);
+        console.warn(`Warning: Logo image not found: ${logoPath}`);
       }
     } catch (e) {
-      console.warn(`警告: ロゴ画像の読み込みに失敗しました: ${e.message}`);
+      console.warn(`Warning: Failed to load logo image: ${e.message}`);
     }
   }
 
@@ -819,7 +819,7 @@ function createCoverSection(options, inputDir) {
   };
 }
 
-// ===== 変更履歴の抽出 =====
+// ===== Changelog extraction =====
 function extractChangelog(markdown) {
   const changelogMatch = markdown.match(/<!--\s*CHANGELOG\s*-->([\s\S]*?)<!--\s*\/CHANGELOG\s*-->/);
   if (!changelogMatch) {
@@ -829,16 +829,16 @@ function extractChangelog(markdown) {
   const changelogContent = changelogMatch[1].trim();
   const lines = changelogContent.split('\n').filter(line => line.trim());
 
-  // ヘッダー行と区切り行をスキップしてデータ行を取得
+  // Skip header and separator rows, get data rows
   const dataRows = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    // 区切り行（|---|---|---|）をスキップ
+    // Skip separator row (|---|---|---|)
     if (line.match(/^\|[\s\-:|]+\|$/)) continue;
-    // ヘッダー行（最初のデータ行）をスキップ
-    if (i === 0 && line.includes('バージョン')) continue;
+    // Skip header row (first data row)
+    if (i === 0 && (line.includes('Version') || line.includes('バージョン'))) continue;
 
-    // テーブル行をパース
+    // Parse table row
     if (line.includes('|')) {
       const cells = line.split('|').map(c => c.trim()).filter((c, idx, arr) => idx > 0 && idx < arr.length - 1 || c !== '');
       if (cells.length >= 3) {
@@ -854,16 +854,16 @@ function extractChangelog(markdown) {
   return dataRows.length > 0 ? dataRows : null;
 }
 
-// ===== 変更履歴セクション =====
+// ===== Change history section =====
 function createHistorySection(options, changelog) {
   const colors = getThemeColors(options.theme);
 
-  // 変更履歴データの準備
+  // Prepare change history data
   const historyData = changelog || [
-    { version: options.version, date: options.date, description: '初版作成' }
+    { version: options.version, date: options.date, description: 'Initial release' }
   ];
 
-  // データ行を生成
+  // Generate data rows
   const dataRows = historyData.map(item => new TableRow({
     children: [
       new TableCell({
@@ -889,7 +889,7 @@ function createHistorySection(options, changelog) {
     headers: { default: createHeader(options) },
     footers: { default: createFooter() },
     children: [
-      new Paragraph({ children: [new TextRun({ text: "[変更履歴]", bold: true, font: "Meiryo", size: 22 })] }),
+      new Paragraph({ children: [new TextRun({ text: "[Change History]", bold: true, font: "Meiryo", size: 22 })] }),
       new Table({
         columnWidths: [1800, 2000, 5226],
         rows: [
@@ -900,19 +900,19 @@ function createHistorySection(options, changelog) {
                 borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
                 width: { size: 1800, type: WidthType.DXA },
                 shading: { fill: colors.tableHeader, type: ShadingType.CLEAR },
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "バージョン", bold: true, font: "Meiryo", size: 20 })] })]
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Version", bold: true, font: "Meiryo", size: 20 })] })]
               }),
               new TableCell({
                 borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
                 width: { size: 2000, type: WidthType.DXA },
                 shading: { fill: colors.tableHeader, type: ShadingType.CLEAR },
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "変更日付", bold: true, font: "Meiryo", size: 20 })] })]
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Date", bold: true, font: "Meiryo", size: 20 })] })]
               }),
               new TableCell({
                 borders: { top: tableBorder, bottom: tableBorder, left: tableBorder, right: tableBorder },
                 width: { size: 5226, type: WidthType.DXA },
                 shading: { fill: colors.tableHeader, type: ShadingType.CLEAR },
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "変更事由", bold: true, font: "Meiryo", size: 20 })] })]
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Description", bold: true, font: "Meiryo", size: 20 })] })]
               })
             ]
           }),
@@ -923,24 +923,24 @@ function createHistorySection(options, changelog) {
   };
 }
 
-// ===== 目次セクション =====
+// ===== Table of contents section =====
 function createTOCSection(options) {
   return {
     properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
     headers: { default: createHeader(options) },
     footers: { default: createFooter() },
     children: [
-      new Paragraph({ children: [new TextRun({ text: "目次", bold: true, font: "Meiryo", size: 28 })] }),
-      new TableOfContents("目次", { hyperlink: true, headingStyleRange: "1-3" })
+      new Paragraph({ children: [new TextRun({ text: "Table of Contents", bold: true, font: "Meiryo", size: 28 })] }),
+      new TableOfContents("Table of Contents", { hyperlink: true, headingStyleRange: "1-3" })
     ]
   };
 }
 
-// ===== 本文要素をWord要素に変換 =====
+// ===== Convert body elements to Word elements =====
 function convertElements(elements, options, inputDir, mermaidRenderedMap = new Map()) {
   const children = [];
   let numberListRef = 0;
-  let currentSectionIndent = 0; // 現在のセクションのインデント
+  let currentSectionIndent = 0; // Current section indent
 
   for (const el of elements) {
     switch (el.type) {
@@ -949,7 +949,7 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
         const sizeMap = { 1: 28, 2: 24, 3: 22 };
         const spacingMap = { 1: { before: 360, after: 240 }, 2: { before: 240, after: 180 }, 3: { before: 180, after: 120 } };
         const headingStyleMap = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 };
-        // #はインデントなし、##以降は360
+        // No indent for #, 360 for ## and below
         currentSectionIndent = el.level === 1 ? 0 : 360;
         children.push(new Paragraph({
           heading: headingStyleMap[headingLevel],
@@ -968,7 +968,7 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
         break;
 
       case 'list':
-        // 番号付きリストのカウント
+        // Count numbered lists
         if (el.listType === 'number') numberListRef++;
         const listRef = `number-${numberListRef}-indent${currentSectionIndent}`;
 
@@ -979,13 +979,13 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
           const itemIndent = baseIndent + itemLevel * 360;
 
           if (el.listType === 'number' && itemLevel === 0) {
-            // 番号付きリストはnumberingを使用
+            // Use numbering for numbered lists
             children.push(new Paragraph({
               numbering: { reference: listRef, level: 0 },
               children: parseInlineMarkup(itemText, inputDir)
             }));
           } else {
-            // 箇条書きはテキストで記号を追加
+            // Add bullet symbol for bullet lists
             const bullet = el.listType === 'bullet' ? (itemLevel === 0 ? '・' : '-') : '-';
             children.push(new Paragraph({
               indent: { left: itemIndent, hanging: 360 },
@@ -1005,14 +1005,14 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
           const imageData = mermaidRenderedMap.get(mermaidKey);
 
           if (imageData) {
-            // PNG画像のサイズを取得
+            // Get PNG image dimensions
             const dimensions = getPngDimensions(imageData);
             let imgWidth = dimensions ? dimensions.width : MERMAID_IMAGE_WIDTH;
             let imgHeight = dimensions ? dimensions.height : Math.round(MERMAID_IMAGE_WIDTH * 0.6);
 
-            // ページ幅・高さに収まるよう縮小（TWIP→ピクセル: 1インチ=1440TWIP, 96dpi）
+            // Scale down to fit page width/height (TWIP to pixels: 1 inch = 1440 TWIP, 96 dpi)
             const maxWidth = (CONTENT_WIDTH - currentSectionIndent) / 1440 * 96;
-            const maxHeight = 600; // 最大高さ（ピクセル）
+            const maxHeight = 600; // Maximum height (pixels)
             if (imgWidth > maxWidth || imgHeight > maxHeight) {
               const scaleW = maxWidth / imgWidth;
               const scaleH = maxHeight / imgHeight;
@@ -1021,7 +1021,7 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
               imgHeight = Math.round(imgHeight * scale);
             }
 
-            // PNG画像として埋め込み
+            // Embed as PNG image
             children.push(new Paragraph({
               indent: { left: currentSectionIndent },
               alignment: AlignmentType.CENTER,
@@ -1037,14 +1037,14 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
               })]
             }));
           } else {
-            // フォールバック: 警告メッセージを表示
+            // Fallback: Display warning message
             children.push(new Paragraph({
               indent: { left: currentSectionIndent },
               shading: { fill: "FFF3CD", type: ShadingType.CLEAR },
               border: { left: { style: BorderStyle.SINGLE, size: 12, color: "FFC107" } },
               children: [
                 new TextRun({
-                  text: '[Mermaid図: レンダリング失敗 - API接続エラーまたはオフライン]',
+                  text: '[Mermaid diagram: Rendering failed - API connection error or offline]',
                   font: "Meiryo",
                   size: 20,
                   color: "856404"
@@ -1055,7 +1055,7 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
           break;
         }
 
-        // 通常のコードブロックは背景色付きで表示
+        // Display regular code blocks with background color
         const codeLines = el.content.split('\n');
         for (const codeLine of codeLines) {
           children.push(new Paragraph({
@@ -1108,7 +1108,7 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
             const imgData = fs.readFileSync(imgPath);
             const ext = path.extname(imgPath).slice(1).toLowerCase();
             const typeMap = { jpg: 'jpg', jpeg: 'jpg', png: 'png', gif: 'gif', bmp: 'bmp' };
-            // width/heightが指定されていればそれを使用、なければデフォルト
+            // Use width/height if specified, otherwise use defaults
             const imgWidth = el.width || 400;
             const imgHeight = el.height || (el.width ? Math.round(el.width * 0.75) : 300);
             children.push(new Paragraph({
@@ -1124,25 +1124,25 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
           } else {
             children.push(new Paragraph({
               indent: { left: currentSectionIndent },
-              children: [new TextRun({ text: `[画像: ${el.src}]`, font: "Meiryo", size: 22, color: "FF0000" })]
+              children: [new TextRun({ text: `[Image: ${el.src}]`, font: "Meiryo", size: 22, color: "FF0000" })]
             }));
           }
         } catch (e) {
           children.push(new Paragraph({
             indent: { left: currentSectionIndent },
-            children: [new TextRun({ text: `[画像読み込みエラー: ${el.src}]`, font: "Meiryo", size: 22, color: "FF0000" })]
+            children: [new TextRun({ text: `[Image load error: ${el.src}]`, font: "Meiryo", size: 22, color: "FF0000" })]
           }));
         }
         break;
 
       case 'hr':
         if (options["hr-pagebreak"]) {
-          // 水平線を改ページとして扱う
+          // Treat horizontal rule as page break
           children.push(new Paragraph({
             children: [new PageBreak()]
           }));
         } else {
-          // 通常の水平線
+          // Regular horizontal rule
           children.push(new Paragraph({
             indent: { left: currentSectionIndent },
             border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" } },
@@ -1169,21 +1169,21 @@ function convertElements(elements, options, inputDir, mermaidRenderedMap = new M
   return children;
 }
 
-// ===== メイン処理 =====
+// ===== Main processing =====
 async function main() {
   const options = parseArgs();
-  
-  // Markdownファイル読み込み
+
+  // Read Markdown file
   const markdownRaw = fs.readFileSync(options.input, 'utf-8');
   const inputDir = path.dirname(path.resolve(options.input));
 
-  // 変更履歴を抽出
+  // Extract changelog
   const changelog = extractChangelog(markdownRaw);
 
-  // CHANGELOGブロックを本文から除外
+  // Exclude CHANGELOG block from body
   let markdown = markdownRaw.replace(/<!--\s*CHANGELOG\s*-->[\s\S]*?<!--\s*\/CHANGELOG\s*-->\s*/, '');
 
-  // md2mdocx:start/end による範囲指定
+  // Range specification using md2mdocx:start/end
   const startMatch = markdown.match(/<!--\s*md2mdocx:start\s*-->/i);
   const endMatch = markdown.match(/<!--\s*md2mdocx:end\s*-->/i);
   if (startMatch) {
@@ -1196,15 +1196,15 @@ async function main() {
     }
   }
 
-  // パース
+  // Parse
   const parser = new MarkdownParser(markdown);
   const elements = parser.parse();
 
-  // Mermaid図の事前レンダリング（テーマ適用）
+  // Pre-render Mermaid diagrams (with theme applied)
   const colors = getThemeColors(options.theme);
   const mermaidRenderedMap = await prerenderMermaidDiagrams(elements, colors.mermaid);
 
-  // 番号付きリストの設定を動的に生成（#はインデントなし、##以降は360）
+  // Dynamically generate numbered list settings (no indent for #, 360 for ## and below)
   const numberConfigs = [];
   let listCount = 0;
   let currentIndent = 0;
@@ -1223,10 +1223,10 @@ async function main() {
     }
   }
 
-  // Word要素に変換
+  // Convert to Word elements
   const contentChildren = convertElements(elements, options, inputDir, mermaidRenderedMap);
 
-  // ドキュメント生成
+  // Generate document
   const doc = new Document({
     styles: {
       default: { document: { run: { font: "Meiryo", size: 22 } } },
@@ -1256,13 +1256,13 @@ async function main() {
     ]
   });
 
-  // 保存
+  // Save
   const buffer = await Packer.toBuffer(doc);
   fs.writeFileSync(options.output, buffer);
-  console.log(`✓ 変換完了: ${options.output}`);
+  console.log(`Done: ${options.output}`);
 }
 
 main().catch(err => {
-  console.error('エラー:', err.message);
+  console.error('Error:', err.message);
   process.exit(1);
 });
