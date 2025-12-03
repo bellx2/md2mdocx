@@ -49,6 +49,7 @@ md2mdocx input.md output.docx
 | `--theme` | カラーテーマ | blue |
 | `--config` | 設定ファイルパス | (自動検出) |
 | `--hr-pagebreak` | `---`を改ページとして扱う | true |
+| `--save-config` | 現在の設定をYAMLファイルに保存 | - |
 
 #### 設定ファイル (YAML)
 
@@ -69,6 +70,25 @@ hr-pagebreak: true
 ```
 
 **優先順位:** コマンドライン引数 > 設定ファイル > デフォルト値
+
+#### 設定の保存
+
+`--save-config`で現在の設定（デフォルト値含む）をYAMLファイルに保存できます:
+
+```bash
+# デフォルト設定を保存
+npx md2mdocx --save-config config.yaml
+
+# カスタム設定を含めて保存
+npx md2mdocx --save-config config.yaml --title "製品名" --theme orange
+
+# 既存の設定を読み込み、変更して保存
+npx md2mdocx --save-config new-config.yaml --config existing.yaml --version "2.0.0"
+```
+
+- 拡張子は自動的に`.yaml`に設定されます
+- 値が`null`のオプションは出力されません
+- `--option=`（イコール付き）で空文字を設定できます
 
 #### テーマオプション
 

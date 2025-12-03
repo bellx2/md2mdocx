@@ -39,6 +39,7 @@
  *
  * その他のオプション:
  *   --hr-pagebreak true/false  水平線(---)を改ページとして扱う（デフォルト: true）
+ *   --save-config "config.yaml" 現在の設定（デフォルト含む）をYAMLファイルとして保存
  */
 
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Header, Footer,
@@ -201,6 +202,36 @@ function loadConfigFile(configPath) {
   }
 }
 
+/**
+ * 設定をYAMLファイルに保存
+ * @param {string} savePath - 保存先ファイルパス
+ * @param {object} options - 保存する設定オブジェクト
+ * @param {object} defaults - デフォルト値オブジェクト
+ */
+function saveConfigFile(savePath, options, defaults) {
+  // 拡張子を.yamlに強制
+  if (!savePath.endsWith('.yaml') && !savePath.endsWith('.yml')) {
+    savePath = savePath + '.yaml';
+  }
+
+  // 保存する設定項目（input, output, config, save-configは除外、nullは除外）
+  const configToSave = {};
+  for (const key of Object.keys(defaults)) {
+    if (options[key] !== null) {
+      configToSave[key] = options[key];
+    }
+  }
+
+  try {
+    const yamlContent = YAML.stringify(configToSave, { lineWidth: 0 });
+    fs.writeFileSync(savePath, yamlContent);
+    console.log(`設定を保存しました: ${savePath}`);
+  } catch (e) {
+    console.error(`エラー: 設定ファイルの保存に失敗しました: ${e.message}`);
+    process.exit(1);
+  }
+}
+
 // ===== コマンドライン引数パース =====
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -224,26 +255,34 @@ function parseArgs() {
   const cliOptions = {
     input: null,
     output: null,
-    config: null
+    config: null,
+    "save-config": null
   };
   const cliValues = {};
 
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith('--')) {
-      const key = args[i].slice(2);
-      if (i + 1 < args.length) {
-        if (key === 'input' || key === 'output' || key === 'config') {
-          cliOptions[key] = args[++i];
-        } else if (defaults.hasOwnProperty(key)) {
-          const value = args[++i];
-          // boolean値の変換
-          if (value === 'true') {
-            cliValues[key] = true;
-          } else if (value === 'false') {
-            cliValues[key] = false;
-          } else {
-            cliValues[key] = value;
-          }
+      let key, value;
+      // --key=value 形式をサポート
+      if (args[i].includes('=')) {
+        const eqIndex = args[i].indexOf('=');
+        key = args[i].slice(2, eqIndex);
+        value = args[i].slice(eqIndex + 1);
+      } else {
+        key = args[i].slice(2);
+        value = (i + 1 < args.length) ? args[++i] : undefined;
+      }
+
+      if (key === 'input' || key === 'output' || key === 'config' || key === 'save-config') {
+        cliOptions[key] = value;
+      } else if (defaults.hasOwnProperty(key) && value !== undefined) {
+        // boolean値の変換
+        if (value === 'true') {
+          cliValues[key] = true;
+        } else if (value === 'false') {
+          cliValues[key] = false;
+        } else {
+          cliValues[key] = value;
         }
       }
     } else if (!cliOptions.input) {
@@ -253,19 +292,22 @@ function parseArgs() {
     }
   }
 
-  if (!cliOptions.input) {
+  // --save-configのみの場合は入力ファイル不要
+  if (!cliOptions.input && !cliOptions["save-config"]) {
     console.error('Usage: node md2docx.js input.md output.docx [options]');
     console.error('Options: --title, --subtitle, --doctype, --version, --date, --dept, --docnum, --logo, --company, --theme, --config');
     console.error('Theme: blue (default), orange, green');
     console.error('');
     console.error('設定ファイル: input.mdと同じパスにあるinput.yamlを自動で読み込みます');
     console.error('              --config オプションで明示的に指定も可能です');
+    console.error('');
+    console.error('設定を保存: --save-config config.yaml で現在の設定をYAMLファイルとして保存');
     process.exit(1);
   }
 
   // 設定ファイルのパスを決定
   let configPath = cliOptions.config;
-  if (!configPath) {
+  if (!configPath && cliOptions.input) {
     // mdファイルと同じパスにある.yamlファイルを探す
     const inputPath = path.resolve(cliOptions.input);
     const yamlPath = inputPath.replace(/\.md$/, '.yaml');
@@ -303,8 +345,14 @@ function parseArgs() {
     options.theme = "blue";
   }
 
-  if (!options.output) {
+  if (!options.output && options.input) {
     options.output = options.input.replace(/\.md$/, '.docx');
+  }
+
+  // --save-configが指定された場合、設定を保存して終了
+  if (cliOptions["save-config"]) {
+    saveConfigFile(cliOptions["save-config"], options, defaults);
+    process.exit(0);
   }
 
   return options;

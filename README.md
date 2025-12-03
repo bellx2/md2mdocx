@@ -47,6 +47,7 @@ md2mdocx input.md output.docx
 | `--theme` | Color theme | blue |
 | `--config` | Config file path | (auto-detect) |
 | `--hr-pagebreak` | Treat `---` as page break | true |
+| `--save-config` | Save current settings to YAML file | - |
 
 #### Config File (YAML)
 
@@ -67,6 +68,25 @@ hr-pagebreak: true
 ```
 
 **Priority:** Command-line arguments > Config file > Defaults
+
+#### Saving Config
+
+Use `--save-config` to export the current settings (including defaults) to a YAML file:
+
+```bash
+# Save default settings
+npx md2mdocx --save-config config.yaml
+
+# Save with custom settings
+npx md2mdocx --save-config config.yaml --title "MyApp" --theme orange
+
+# Load existing config, modify, and save
+npx md2mdocx --save-config new-config.yaml --config existing.yaml --version "2.0.0"
+```
+
+- The file extension is automatically set to `.yaml`
+- Options with `null` values are omitted
+- Use `--option=` (with equals sign) to set an empty string
 
 #### Theme Options
 
