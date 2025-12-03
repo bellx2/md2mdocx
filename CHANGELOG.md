@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.4] - 2025-12-03
+
+### Added
+
+- `--save-config` オプションを追加
+  - 現在の設定（デフォルト値含む）をYAMLファイルとして保存
+  - 拡張子は自動的に`.yaml`に設定
+  - nullの値は出力から除外
+- `--key=value` 形式の引数指定をサポート
+  - `--option=` で空文字を設定可能
+
+### Changed
+
+- ヘッダーのカラム比率を6:4に変更
+- ヘッダーのフォントサイズを縮小（20→18）
+
 ## [1.1.3] - 2025-12-02
 
 ### Added

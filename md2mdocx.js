@@ -703,26 +703,30 @@ function createHeader(options) {
   const colors = getThemeColors(options.theme);
   const headerBorder = { style: BorderStyle.SINGLE, size: 24, color: colors.headerBorder };
 
+  // 6:4の比率
+  const leftWidth = Math.floor(CONTENT_WIDTH * 0.6);
+  const rightWidth = CONTENT_WIDTH - leftWidth;
+
   return new Header({
     children: [
       new Table({
-        columnWidths: [CONTENT_WIDTH / 2, CONTENT_WIDTH / 2],
+        columnWidths: [leftWidth, rightWidth],
         rows: [
           new TableRow({
             children: [
               new TableCell({
                 borders: { top: {style: BorderStyle.NIL}, bottom: headerBorder, left: {style: BorderStyle.NIL}, right: {style: BorderStyle.NIL} },
-                width: { size: CONTENT_WIDTH / 2, type: WidthType.DXA },
+                width: { size: leftWidth, type: WidthType.DXA },
                 children: [new Paragraph({
-                  children: [new TextRun({ text: `${options.title} ${options.doctype} Version ${options.version}`, size: 20, font: "Meiryo", color: "000000" })]
+                  children: [new TextRun({ text: `${options.title} ${options.doctype} Version ${options.version}`, size: 18, font: "Meiryo", color: "000000" })]
                 })]
               }),
               new TableCell({
                 borders: { top: {style: BorderStyle.NIL}, bottom: headerBorder, left: {style: BorderStyle.NIL}, right: {style: BorderStyle.NIL} },
-                width: { size: CONTENT_WIDTH / 2, type: WidthType.DXA },
+                width: { size: rightWidth, type: WidthType.DXA },
                 children: [new Paragraph({
                   alignment: AlignmentType.RIGHT,
-                  children: [new TextRun({ text: `文書管理番号:　${options.docnum}`, size: 20, font: "Meiryo", color: "000000" })]
+                  children: [new TextRun({ text: `文書管理番号: ${options.docnum}`, size: 18, font: "Meiryo", color: "000000" })]
                 })]
               })
             ]
