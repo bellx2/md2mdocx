@@ -175,6 +175,7 @@ HTMLのimgタグでサイズ指定も可能。
 |------|------|
 | `<br>` | 段落内で強制改行 |
 | `<pagebreak>` | 強制改ページ |
+| `<div style="page-break-before:always"></div>` | 強制改ページ（HTML形式） |
 | `---` | 改ページ（`--hr-pagebreak true`時、デフォルト）または水平線 |
 
 ### HTMLコメント制御

@@ -2,7 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.1.6] - 2025-12-23
+
+### Added
+
+- `<div style="page-break-before:always"></div>` 形式の改ページをサポート
 
 ## [1.1.5] - 2025-12-03
 

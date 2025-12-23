@@ -36,6 +36,7 @@
  *   <!-- md2mdocx:end -->    End parsing at this line (skip file footer)
  *   <!-- md2mdocx:pagebreak --> Page break
  *   <!-- md2mdocx:br -->     Line break
+ *   <div style="page-break-before:always"></div>  Page break (HTML style)
  *
  * Other options:
  *   --hr-pagebreak true/false  Treat horizontal rules (---) as page breaks (default: true)
@@ -391,6 +392,13 @@ class MarkdownParser {
 
       // 強制改ページ（HTMLコメント形式）
       if (line.match(/^<!--\s*md2mdocx:pagebreak\s*-->$/i)) {
+        this.elements.push({ type: 'pagebreak' });
+        this.pos++;
+        continue;
+      }
+
+      // 強制改ページ（HTML div形式）
+      if (line.match(/^<div\s+style=["']page-break-before:\s*always["']\s*>\s*<\/div>$/i)) {
         this.elements.push({ type: 'pagebreak' });
         this.pos++;
         continue;

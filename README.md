@@ -154,6 +154,7 @@ This content appears on a new page.
 |--------|--------|
 | `<br>` | Force line break within paragraph |
 | `<pagebreak>` | Force page break |
+| `<div style="page-break-before:always"></div>` | Force page break (HTML style) |
 | `---` | Page break (when `--hr-pagebreak true`, default) or horizontal rule |
 
 ### HTML Comment Controls
