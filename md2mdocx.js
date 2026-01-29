@@ -539,6 +539,9 @@ class MarkdownParser {
   parseList(listType) {
     const items = [];
     const topPattern = listType === 'bullet' ? /^[-*+]\s+(.+)$/ : /^\d+\.\s+(.+)$/;
+    // インデント付きリストのパターン（箇条書きと番号付き両方に対応）
+    const indentedBulletPattern = /^(\s+)[-*+]\s+(.+)$/;
+    const indentedNumberPattern = /^(\s+)\d+\.\s+(.+)$/;
 
     while (this.pos < this.lines.length) {
       const line = this.lines[this.pos];
@@ -548,11 +551,18 @@ class MarkdownParser {
         // トップレベルのリスト項目
         items.push({ text: topMatch[1], level: 0 });
         this.pos++;
-      } else if (line.match(/^(\s+)[-*+]\s+(.+)$/)) {
+      } else if (line.match(indentedBulletPattern)) {
         // ネストされた箇条書き（インデントの深さでレベルを決定）
-        const match = line.match(/^(\s+)[-*+]\s+(.+)$/);
+        const match = line.match(indentedBulletPattern);
         const indent = match[1].length;
         // 2-3スペースでlevel 1、4-5スペースでlevel 2、以降も同様
+        const level = Math.min(Math.floor((indent + 1) / 2), 3);
+        items.push({ text: match[2], level: level });
+        this.pos++;
+      } else if (line.match(indentedNumberPattern)) {
+        // ネストされた番号付きリスト（インデントの深さでレベルを決定）
+        const match = line.match(indentedNumberPattern);
+        const indent = match[1].length;
         const level = Math.min(Math.floor((indent + 1) / 2), 3);
         items.push({ text: match[2], level: level });
         this.pos++;
